@@ -216,7 +216,9 @@ no SDL 1.2 in any sysroot - the game smoke runs there move to phase 2), gcc-6 ne
    the ARM dynarec. Expect gcc-6 fallout in upstream's newer C (`-std=gnu11`, statement expressions are
    fine; `_Static_assert` and `__builtin_*` are); fix in place with a comment, upstream if general.
 
-**Phase 2 - the SDL2 platform** (`feature/sdl2-platform`)
+**Phase 2 - the SDL2 platform** (`feature/sdl2-platform`) - **done 2026-09-20** on Windows (window, frame, menu,
+keyboard); the Pis and the console build with it, their runs are pending (the Pi 400 over ssh, the console
+with the owner).
 
 5. `frontend/plat_sdl2.c` + libpicofe `plat_sdl2.c`/`in_sdl2.c`: window, GL/GLES2 context through SDL,
    `gl.c` for the frame (filter = texture sampling, `-ratio` = viewport), the menu's 16-bit framebuffer
@@ -227,7 +229,8 @@ no SDL 1.2 in any sysroot - the game smoke runs there move to phase 2), gcc-6 ne
    first time; measure a frame against pcsx-ab's `gl_platform.c` path before deciding the fallback is
    not needed).
 
-**Phase 3 - the AutoBleem contract** (`feature/ab-contract`)
+**Phase 3 - the AutoBleem contract** (`feature/ab-contract`) - **done 2026-09-20** on Windows but for the
+resume load, which needs a real BIOS (see CLAUDE.md, "Known"): checked on the console/Pi with phase 2's run.
 
 6. `frontend/ab/ab_config.c`: the arguments (6), `Bios = SET_BY_PCSX` (13), `autobleem.cfg` (12),
    `open_invalid_time`, `config_change()`'s plumbing (14), `check_memcards` + `fsync` (15), `-load 1`.
