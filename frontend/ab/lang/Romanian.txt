@@ -1,0 +1,12 @@
+# pcsx-abnxt Romanian translation - the emulator's own screens (the disc picker and its messages).
+# The launcher's language files' format: English text=Translated text, one per line, '#' comments.
+# |@font| names a font file in skin/ or fonts/ next to the emulator when skin/ui.ttf lacks this
+# language's glyphs (Chinese: the launcher's Noto Sans SC, linked in as fonts/ by the launch script).
+
+Change disc=Schimbă discul
+Disc=Disc
+This game has only one disc=Acest joc are un singur disc
+You can't change discs now=Discul nu poate fi schimbat acum
+OK=OK
+Select=Alege
+Back=Înapoi

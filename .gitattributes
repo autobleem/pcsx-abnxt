@@ -9,3 +9,5 @@ frontend/ab/** text eol=lf
 toolchains/** text eol=lf
 ci/** text eol=lf
 CLAUDE.md text eol=lf
+*.ttf binary
+*.otf binary

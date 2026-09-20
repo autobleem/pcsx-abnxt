@@ -30,7 +30,20 @@ struct ab_options ab_opts = {
 	.region = 4,
 	.enter = 1,
 	.display = 1,
+	.language = "English",
 };
+
+static int take_str(const char *name, char *value, size_t size, int argc, char *argv[], int *i)
+{
+	if (strcmp(argv[*i], name) != 0)
+		return 0;
+	if (*i + 1 >= argc) {
+		fprintf(stderr, "%s needs a value\n", name);
+		return 1;
+	}
+	snprintf(value, size, "%s", argv[++*i]);
+	return 1;
+}
 
 static int take_int(const char *name, int *value, int lo, int hi, int argc, char *argv[], int *i)
 {
@@ -66,13 +79,14 @@ int ab_args_take(int argc, char *argv[])
 		    || take_int("-lang", &ab_opts.lang, 1, 13, argc, argv, &i)
 		    || take_int("-region", &ab_opts.region, 1, 4, argc, argv, &i)
 		    || take_int("-enter", &ab_opts.enter, 0, 2, argc, argv, &i)
-		    || take_int("-display", &ab_opts.display, 0, 1, argc, argv, &i))
+		    || take_int("-display", &ab_opts.display, 0, 1, argc, argv, &i)
+		    || take_str("-language", ab_opts.language, sizeof(ab_opts.language), argc, argv, &i))
 			continue;
 		argv[out++] = argv[i];
 	}
 	argv[out] = NULL;
-	printf("autobleem: filter=%d ratio=%d lang=%d region=%d\n",
-		ab_opts.filter, ab_opts.ratio, ab_opts.lang, ab_opts.region);
+	printf("autobleem: filter=%d ratio=%d lang=%d region=%d language=%s\n",
+		ab_opts.filter, ab_opts.ratio, ab_opts.lang, ab_opts.region, ab_opts.language);
 	return out;
 }
 

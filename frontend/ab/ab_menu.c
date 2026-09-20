@@ -15,6 +15,8 @@
 
 #include "ab_disc.h"
 #include "ab_buttons.h"
+#include "ab_console.h"
+#include "ab_ui.h"
 
 /* our ids, past the menu.c enum's */
 enum {
@@ -30,6 +32,7 @@ enum {
 
 static int ab_menu_handler(int id, int keys);
 static int ab_menu_pcsx_handler(int id, int keys);
+static int ab_disc_screen(void);
 
 static const char h_ab_filter[] = "Off = plain pixels, Linear = smoothed, Sharp = crisp pixels without shimmer";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
@@ -125,13 +128,10 @@ static int ab_menu_handler(int id, int keys)
 	case MA_AB_DISC:
 		if (!ready_to_go || !CdromId[0])
 			break;
-		if (ab_disc_count() <= 1) {
-			menu_update_msg("This game has one disc");
-			break;
-		}
-		/* the change goes through the same path as the Open button, as an emulator action */
-		ab_request_action(SACTION_AB_CD_CHANGE);
-		return 1;
+		/* the same screens the Open button shows; a disc put in resumes the game */
+		if (ab_disc_screen())
+			return 1;
+		break;
 	case MA_AB_FILTER:
 		if (plat_target.hwfilters == NULL)
 			break;
@@ -151,6 +151,181 @@ static int ab_menu_handler(int id, int keys)
 }
 
 /* upstream's main menu, one level down; 1 when it asked to go back to the game or to exit */
+/* ---- the disc picker (docs/port-plan.md, phase 5) ----
+ *
+ * Drawn on the menu's canvas over the darkened last frame, the way the menus are, at a 1280x720 design
+ * scaled to the canvas: the title, the set's discs in a row (the one in the drive in AutoBleem's cyan,
+ * the focused one bright with a ring, the rest dimmed), "Disc n" under each, and Cross/Circle hints at
+ * the bottom. The text is the launcher's language through ab_ui (the built-in 8x8 font, in English, when
+ * there is no ui font). Sony's picker started on the next disc and so does this one: Open, Cross is the
+ * common case. */
+
+static const unsigned short ab_col_text   = AB_RGB565(0xf4, 0xf6, 0xf8);
+static const unsigned short ab_col_dim    = AB_RGB565(0x9a, 0xa4, 0xb2);
+static const unsigned short ab_col_accent = AB_RGB565(0x4f, 0xc3, 0xf7);
+
+static struct ab_canvas ab_canvas(void)
+{
+	struct ab_canvas c = { g_menuscreen_ptr, g_menuscreen_w, g_menuscreen_h, g_menuscreen_pp };
+	return c;
+}
+
+static int ab_text_width(const char *s, int px)
+{
+	return ab_ui_has_font() ? ab_ui_text_width(s, px) : (int)strlen(s) * me_mfont_w;
+}
+
+static void ab_text(struct ab_canvas *c, int x, int y, int align, const char *s, int px, unsigned short col)
+{
+	int w;
+
+	if (ab_ui_has_font()) {
+		ab_ui_text(c, x, y, align, s, px, col);
+		return;
+	}
+	w = ab_text_width(s, px);
+	if (align == AB_UI_CENTER)
+		x -= w / 2;
+	else if (align == AB_UI_RIGHT)
+		x -= w;
+	text_out16(x, y + (px - me_mfont_h) / 2, "%s", s);
+}
+
+/* "(x) Select   (o) Back" centred near the bottom; back == NULL for a plain "(x) OK" */
+static void ab_footer(struct ab_canvas *c, const char *ok, const char *back)
+{
+	float s = c->h / 720.0f;
+	int px = (int)(24 * s), r = (int)(13 * s), gap = (int)(12 * s), sep = (int)(48 * s);
+	int y = (int)(c->h * 0.86f), x, w1, w2 = 0, total;
+
+	w1 = ab_text_width(ok, px);
+	if (back != NULL)
+		w2 = ab_text_width(back, px);
+	total = 2 * r + gap + w1 + (back != NULL ? sep + 2 * r + gap + w2 : 0);
+	x = (c->w - total) / 2;
+	ab_ui_cross(c, x + r, y + px / 2, r, ab_col_accent);
+	ab_text(c, x + 2 * r + gap, y, AB_UI_LEFT, ok, px, ab_col_text);
+	if (back != NULL) {
+		x += 2 * r + gap + w1 + sep;
+		ab_ui_circle(c, x + r, y + px / 2, r, ab_col_accent);
+		ab_text(c, x + 2 * r + gap, y, AB_UI_LEFT, back, px, ab_col_text);
+	}
+}
+
+static void ab_draw_disc_picker(int n, int cur, int sel)
+{
+	struct ab_canvas c;
+	float s;
+	int r, gap, step, x0, cy, i;
+	char label[80];
+
+	menu_draw_begin(1, 1);
+	c = ab_canvas();
+	s = c.h / 720.0f;
+	ab_text(&c, c.w / 2, (int)(c.h * 0.15f), AB_UI_CENTER, ab_ui_str(AB_STR_CHANGE_DISC), (int)(40 * s), ab_col_text);
+
+	r = (int)(62 * s);
+	gap = (int)(58 * s);
+	step = 2 * r + gap;
+	x0 = (c.w - (n * 2 * r + (n - 1) * gap)) / 2 + r;
+	cy = (int)(c.h * 0.50f);
+	for (i = 0; i < n; i++) {
+		int cx = x0 + i * step;
+		ab_ui_disc(&c, cx, cy, r, i == cur, i != sel);
+		if (i == sel)
+			ab_ui_ring(&c, cx, cy, r + (int)(9 * s), (int)(4 * s) > 1 ? (int)(4 * s) : 1, ab_col_accent);
+		snprintf(label, sizeof(label), "%s %d", ab_ui_str(AB_STR_DISC), i + 1);
+		ab_text(&c, cx, cy + r + (int)(20 * s), AB_UI_CENTER, label, (int)(26 * s),
+			i == sel ? ab_col_text : ab_col_dim);
+	}
+	ab_footer(&c, ab_ui_str(AB_STR_SELECT), ab_ui_str(AB_STR_BACK));
+	menu_draw_end();
+}
+
+static void ab_draw_message(const char *msg)
+{
+	struct ab_canvas c;
+	float s;
+
+	menu_draw_begin(1, 1);
+	c = ab_canvas();
+	s = c.h / 720.0f;
+	ab_text(&c, c.w / 2, (int)(c.h * 0.44f), AB_UI_CENTER, msg, (int)(34 * s), ab_col_text);
+	ab_footer(&c, ab_ui_str(AB_STR_OK), NULL);
+	menu_draw_end();
+}
+
+/* the buttons that got us here are not the screen's */
+static void ab_wait_released(void)
+{
+	while (in_menu_wait_any(NULL, 50) & (PBTN_MOK|PBTN_MBACK|PBTN_MENU)) {
+		if (ab_console_power_off_requested)
+			break;
+	}
+}
+
+static void ab_message_screen(const char *msg)
+{
+	int inp;
+
+	ab_draw_message(msg);
+	ab_wait_released();
+	for (;;) {
+		inp = in_menu_wait(PBTN_MOK|PBTN_MBACK|PBTN_MENU, NULL, 70);
+		if (ab_console_power_off_requested || (inp & (PBTN_MOK|PBTN_MBACK|PBTN_MENU)))
+			break;
+		if (inp & PBTN_RDRAW)
+			ab_draw_message(msg);
+	}
+}
+
+/* in the menu's context; 1 when a disc went in (the game should go on), 0 otherwise */
+static int ab_disc_screen(void)
+{
+	int n, cur, sel, inp;
+
+	ab_ui_load(ab_opts.language);
+	n = ab_disc_count();
+	cur = ab_disc_current();
+	if (!ab_disc_can_change() || n == 0) {
+		ab_message_screen(ab_ui_str(AB_STR_NOT_NOW));
+		return 0;
+	}
+	if (n <= 1) {
+		ab_message_screen(ab_ui_str(AB_STR_ONE_DISC));
+		return 0;
+	}
+	sel = (cur + 1) % n;
+	ab_draw_disc_picker(n, cur, sel);
+	ab_wait_released();
+	for (;;) {
+		inp = in_menu_wait(PBTN_LEFT|PBTN_RIGHT|PBTN_MOK|PBTN_MBACK|PBTN_MENU, NULL, 70);
+		if (ab_console_power_off_requested || (inp & (PBTN_MBACK|PBTN_MENU)))
+			return 0;
+		if (inp & PBTN_MOK) {
+			if (sel == cur)
+				return 0;	/* the disc that is in already: nothing to do */
+			return ab_disc_insert(sel) == 0;
+		}
+		if ((inp & PBTN_LEFT) && sel > 0)
+			sel--;
+		if ((inp & PBTN_RIGHT) && sel < n - 1)
+			sel++;
+		ab_draw_disc_picker(n, cur, sel);
+	}
+}
+
+/* the Open button's path: from the running game and back to it (ab_disc_change) */
+void ab_menu_change_disc(void)
+{
+	menu_leave_emu();
+	in_set_config_int(0, IN_CFG_BLOCKING, 1);
+	ab_disc_screen();
+	ab_wait_released();
+	in_set_config_int(0, IN_CFG_BLOCKING, 0);
+	menu_prepare_emu();
+}
+
 static int ab_menu_pcsx_handler(int id, int keys)
 {
 	static int sel = 0;

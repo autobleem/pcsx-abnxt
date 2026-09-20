@@ -10,13 +10,35 @@ change (commit messages are prose).
 
 ## State (2026-09-20)
 
-Phases 0-4 and 6 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the
+Phases 0-6 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the
 SDL2 platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave
-ring and the power daemon, the in-game menu, and phase 5's disc change without its picker screen. All of it
+ring and the power daemon, the disc change with its picker (below), the in-game menu. All of it
 verified on Windows first; **running on the Pi 400 since 2026-09-20** (64-bit, `Autobleem/bin/emunxt/`,
 the launcher's Options -> "PS1 Emulator") - Crash Bandicoot and Harvest Moon with the real BIOS, the
-menu, scanlines, the pad. The console is still unrun. Next: phase 5's picker and phase 7 (the
-compatibility pass).
+menu, scanlines, the pad. The console is still unrun. Next: phase 7 (the compatibility pass).
+
+**The disc picker and the emulator's own language** (2026-09-20, phase 5 complete): the Open button and
+the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the paused game - the set's discs in
+a row (drawn in code, `ab_ui_disc`: the one in the drive in AutoBleem's cyan, the focused one bright with
+a ring, the others dimmed), "Disc n" under each, Cross/Circle hints; Left/Right, Cross puts the focused
+disc in through the lid (`ab_disc_insert`), Circle backs out, the focus starts on the *next* disc as
+Sony's did (Open, Cross is the common case). A single-disc game or a press in the 22 s grace gets a
+message screen with an OK. **The text is the launcher's language, not Sony's 13 PNG sets**: the
+launcher starts pcsx-abnxt with `-language <Name>` (config.ini's `language`, the name of its own lang
+file - only nxt gets it, the classic pcsx-ab would take it for a file) and `lang/<Name>.txt` next to the
+emulator (`frontend/ab/lang/`, all 17 of the launcher's languages, its `English text=Translated text`
+format) has the seven strings; `ab_ui.c` rasterises them with **stb_truetype** (vendored,
+`frontend/ab/stb_truetype.h`, public domain - no new library on any platform) straight into the menu's
+RGB565 canvas from `skin/ui.ttf` (Selawik Light, 44 KB, OFL - the ab2 theme's font; every non-CJK
+string's glyphs checked) or the font a language file names with `|@font|` (Chinese: the launcher's
+`NotoSansSC-Regular.otf`, found in `fonts/`, which the launch scripts link to the launcher's fonts
+folder). No font = English through libpicofe's 8x8 font. `ci/build.sh`'s `dist()`, `make_packages.sh`
+and `make_win.sh` ship `skin/ui.ttf` + `lang/` with the emulator. **Do not call `CheckCdrom()` after
+`LidInterrupt()`**: the core's lid sequence runs it itself on the close, and a second one mid-sequence
+killed the game. A swap while a game is loading kills it as on hardware (Crash during its boot: an
+invalid load under lightrec, a black screen under the interpreter); at its title it goes on with the new
+disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are bound too).
+`PLAT_SDL2_SHOT_MS` sets the capture interval (a menu screen is gone in 5 s).
 
 **What the first Pi day found and fixed** (r26-26..32), each a rule from now on:
 - every launcher option must reach nxt: the game editor's `pcsx.cfg` keys were audited against the

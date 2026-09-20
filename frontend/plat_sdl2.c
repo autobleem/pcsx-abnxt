@@ -63,6 +63,12 @@ static const struct in_default_bind in_sdl2_defbinds[] = {
   { SDL_SCANCODE_F8,     IN_BINDTYPE_EMU, SACTION_SWITCH_DISPMODE },
   { SDL_SCANCODE_F11,    IN_BINDTYPE_EMU, SACTION_TOGGLE_FULLSCREEN },
   { SDL_SCANCODE_BACKSPACE, IN_BINDTYPE_EMU, SACTION_FAST_FORWARD },
+  /* the console's front buttons as its kernel sends them (the launcher's pcsx.cfg binds them too), and
+   * F9/F10 for a keyboard without them: Open = the disc picker, Reset = out with the resume point */
+  { SDL_SCANCODE_EJECT,     IN_BINDTYPE_EMU, SACTION_AB_CD_CHANGE },
+  { SDL_SCANCODE_F9,        IN_BINDTYPE_EMU, SACTION_AB_CD_CHANGE },
+  { SDL_SCANCODE_AUDIOPLAY, IN_BINDTYPE_EMU, SACTION_AB_RESET },
+  { SDL_SCANCODE_F10,       IN_BINDTYPE_EMU, SACTION_AB_RESET },
   { 0, 0, 0 }
 };
 

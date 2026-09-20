@@ -1,0 +1,13 @@
+# pcsx-abnxt Chinese_Simplified translation - the emulator's own screens (the disc picker and its messages).
+# The launcher's language files' format: English text=Translated text, one per line, '#' comments.
+# |@font| names a font file in skin/ or fonts/ next to the emulator when skin/ui.ttf lacks this
+# language's glyphs (Chinese: the launcher's Noto Sans SC, linked in as fonts/ by the launch script).
+
+Change disc=更换光盘
+Disc=光盘
+This game has only one disc=此游戏只有一张光盘
+You can't change discs now=现在无法更换光盘
+OK=确定
+Select=选择
+Back=返回
+|@font|=NotoSansSC-Regular.otf

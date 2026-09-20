@@ -241,7 +241,7 @@ resume load, which needs a real BIOS (see CLAUDE.md, "Known"): checked on the co
 
 **Phase 4 - the console's buttons and the ring** (`feature/console-buttons`) - **done 2026-09-20** on Windows
 (Reset/Open on the F10/F9 binds, the ring, the raw state loading back); the power daemon and the real
-front buttons wait for the console. Phase 5's disc set and lid change came with it, without the picker.
+front buttons wait for the console. Phase 5's disc set and lid change came with it; the picker on 2026-09-20.
 
 8. `ab_buttons.c`: `SACTION_CD_CHANGE`/`RESET_EVENT`/`POWER_OFF` and the key binds; `ab_console.c` (PSC
    only, a CMake option): the power daemon inotify thread, the temperature thread (2), `power_off_flg`
@@ -254,7 +254,10 @@ front buttons wait for the console. Phase 5's disc set and lid change came with 
    CLAUDE.md). Verify on the console: reset button -> launcher shows the slot ~10 s back; power button ->
    the state is there after the reboot; a reset during a memcard save is held.
 
-**Phase 5 - disc change** (`feature/disc-change`)
+**Phase 5 - disc change** (`feature/disc-change`, the picker `feature/disc-picker`) - **done 2026-09-20** on
+Windows. The screens are not Sony's PNGs: the launcher's language through `-language` and the emulator's
+own `lang/<Name>.txt` files, drawn with stb_truetype (see CLAUDE.md). Verified on Windows with a two-disc
+set; FF7/MGS on the console and the Pi are phase 7's.
 
 10. `ab_disc.c`: the disc set of the running game (the folder's `.cue`/`.chd`/`.pbp` list as pcsx-ab counts
     it, an `.m3u` when there is one, PBP's own multi-disc through upstream), the change through

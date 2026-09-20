@@ -1,0 +1,12 @@
+# pcsx-abnxt Swedish translation - the emulator's own screens (the disc picker and its messages).
+# The launcher's language files' format: English text=Translated text, one per line, '#' comments.
+# |@font| names a font file in skin/ or fonts/ next to the emulator when skin/ui.ttf lacks this
+# language's glyphs (Chinese: the launcher's Noto Sans SC, linked in as fonts/ by the launch script).
+
+Change disc=Byt skiva
+Disc=Skiva
+This game has only one disc=Det här spelet har bara en skiva
+You can't change discs now=Du kan inte byta skiva nu
+OK=OK
+Select=Välj
+Back=Tillbaka

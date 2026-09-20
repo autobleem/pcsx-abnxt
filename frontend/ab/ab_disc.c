@@ -178,10 +178,17 @@ int ab_disc_current(void)
 	return disc_current;
 }
 
-static int insert(int index)
+int ab_disc_can_change(void)
+{
+	return plat_get_ticks_ms() - start_ms >= AB_OPEN_GRACE_S * 1000u;
+}
+
+int ab_disc_insert(int index)
 {
 	char msg[64];
 
+	if (index < 0 || index >= disc_count)
+		return -1;
 	CdromId[0] = 0;
 	CdromLabel[0] = 0;
 	if (kind == DISCS_PBP) {
@@ -198,9 +205,10 @@ static int insert(int index)
 			return -1;
 		}
 	}
+	/* the lid opens for 2 s; on the close the core's lid sequence runs CheckCdrom() itself (the new
+	 * disc's id and region) - doing it here as well, mid-sequence, is what crashed the game */
 	SetCdOpenCaseTime(time(NULL) + 2);
 	LidInterrupt();
-	CheckCdrom();
 	disc_current = index;
 	/* a state from before the change would put the old disc back */
 	ab_autosave_reset();
@@ -215,13 +223,5 @@ void ab_disc_change(void)
 {
 	if (kind == DISCS_NONE)
 		learn_set();
-	if (plat_get_ticks_ms() - start_ms < AB_OPEN_GRACE_S * 1000u) {
-		hud("CAN'T CHANGE DISCS NOW");
-		return;
-	}
-	if (disc_count <= 1) {
-		hud("THIS GAME HAS ONE DISC");
-		return;
-	}
-	insert((disc_current + 1) % disc_count);
+	ab_menu_change_disc();
 }
