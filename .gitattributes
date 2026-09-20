@@ -11,3 +11,4 @@ ci/** text eol=lf
 CLAUDE.md text eol=lf
 *.ttf binary
 *.otf binary
+*.jpg binary

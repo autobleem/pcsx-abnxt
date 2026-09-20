@@ -41,6 +41,7 @@ static int ab_menu_handler(int id, int keys);
 static int ab_menu_pcsx_handler(int id, int keys);
 static int ab_disc_screen(void);
 static const char *ab_filter_name(int id, int *offs);
+static void ab_menu_prepare_bg(void);
 
 static const char h_ab_filter[] = "Off = plain pixels, Linear = smoothed, Sharp = crisp pixels without shimmer";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
@@ -168,18 +169,25 @@ static const char *ab_filter_name(int id, int *offs)
 	return plat_target.hwfilters != NULL ? plat_target.hwfilters[plat_target.hwfilter] : "-";
 }
 
-/* ---- the disc picker ----
+/* ---- the disc picker (docs/port-plan.md, phase 5) ----
  *
- * Drawn on the menu's canvas over the darkened last frame, the way the menus are, at a 1280x720 design
- * scaled to the canvas: the title, the set's discs in a row (the one in the drive in AutoBleem's cyan,
- * the focused one bright with a ring, the rest dimmed), "Disc n" under each, and Cross/Circle hints at
- * the bottom. The text is the launcher's language through ab_ui (the built-in 8x8 font, in English, when
- * there is no ui font). Sony's picker started on the next disc and so does this one: Open, Cross is the
- * common case. */
+ * Drawn on the menu's screen (the art, the bar - "the menu screen" below), at a 1280x720 design scaled
+ * to the canvas: the title top left, the set's discs in a row on a panel (the one in the drive in
+ * AutoBleem's cyan, the focused one bright with a ring, the rest dimmed), "Disc n" under each, and
+ * Cross/Circle hints on the bar. The text is the launcher's language through ab_ui (the built-in 8x8
+ * font, in English, when there is no ui font). Sony's picker started on the next disc and so does this
+ * one: Open, Cross is the common case. */
 
 static const unsigned short ab_col_text   = AB_RGB565(0xf4, 0xf6, 0xf8);
 static const unsigned short ab_col_dim    = AB_RGB565(0x9a, 0xa4, 0xb2);
 static const unsigned short ab_col_accent = AB_RGB565(0x4f, 0xc3, 0xf7);
+static const unsigned short ab_col_panel  = AB_RGB565(0x04, 0x12, 0x30);
+static const unsigned short ab_col_row    = AB_RGB565(0x1a, 0x7e, 0xc4);
+static const unsigned short ab_col_name   = AB_RGB565(0xd6, 0xdd, 0xe6);
+static const unsigned short ab_col_shadow = AB_RGB565(0x00, 0x08, 0x1c);
+
+static unsigned short *ab_bg;		/* the art at the canvas' size, bright (ab_menu_prepare_bg) */
+static int ab_bg_w, ab_bg_h;
 
 static struct ab_canvas ab_canvas(void)
 {
@@ -192,41 +200,69 @@ static int ab_text_width(const char *s, int px)
 	return ab_ui_has_font() ? ab_ui_text_width(s, px) : (int)strlen(s) * me_mfont_w;
 }
 
-static void ab_text(struct ab_canvas *c, int x, int y, int align, const char *s, int px, unsigned short col)
+/* returns the text's width */
+static int ab_text(struct ab_canvas *c, int x, int y, int align, const char *s, int px, unsigned short col)
 {
 	int w;
 
-	if (ab_ui_has_font()) {
-		ab_ui_text(c, x, y, align, s, px, col);
-		return;
-	}
+	if (ab_ui_has_font())
+		return ab_ui_text(c, x, y, align, s, px, col);
 	w = ab_text_width(s, px);
 	if (align == AB_UI_CENTER)
 		x -= w / 2;
 	else if (align == AB_UI_RIGHT)
 		x -= w;
 	text_out16(x, y + (px - me_mfont_h) / 2, "%s", s);
+	return w;
 }
 
-/* "(x) Select   (o) Back" centred near the bottom; back == NULL for a plain "(x) OK" */
+/* a screen of ours begins: the canvas with the art on it */
+static struct ab_canvas ab_screen_begin(void)
+{
+	struct ab_canvas c;
+	int y;
+
+	menu_draw_begin(0, 1);
+	c = ab_canvas();
+	if (ab_bg != NULL && ab_bg_w == c.w && ab_bg_h == c.h)
+		for (y = 0; y < c.h; y++)
+			memcpy(c.fb + (size_t)y * c.pitch, ab_bg + (size_t)y * c.w, c.w * 2);
+	else
+		memset(c.fb, 0, (size_t)c.h * c.pitch * 2);
+	return c;
+}
+
+/* text with a soft dark shadow behind it, for the parts drawn straight over the art */
+static void ab_text_shadow(struct ab_canvas *c, int x, int y, int align, const char *s, int px, unsigned short col)
+{
+	int d = px >= 30 ? 2 : 1;
+	ab_text(c, x + d, y + d, align, s, px, ab_col_shadow);
+	ab_text(c, x, y, align, s, px, col);
+}
+
+/* a pad glyph and its text, left to right from *x, which moves past them */
+static void ab_hint(struct ab_canvas *c, int *x, int y, int px, int is_cross, const char *text)
+{
+	float s = c->h / 720.0f;
+	int r = (int)(12 * s), gap = (int)(10 * s);
+
+	if (is_cross)
+		ab_ui_cross(c, *x + r, y + px / 2, r, ab_col_accent);
+	else
+		ab_ui_circle(c, *x + r, y + px / 2, r, ab_col_accent);
+	*x += 2 * r + gap;
+	*x += ab_text(c, *x, y, AB_UI_LEFT, text, px, ab_col_text) + (int)(36 * s);
+}
+
+/* "(x) ok   (o) back" on the art's bar, from its left end; back == NULL for a plain "(x) OK" */
 static void ab_footer(struct ab_canvas *c, const char *ok, const char *back)
 {
 	float s = c->h / 720.0f;
-	int px = (int)(24 * s), r = (int)(13 * s), gap = (int)(12 * s), sep = (int)(48 * s);
-	int y = (int)(c->h * 0.86f), x, w1, w2 = 0, total;
+	int px = (int)(22 * s), x = (int)(490 * s), y = (int)(647 * s);
 
-	w1 = ab_text_width(ok, px);
+	ab_hint(c, &x, y, px, 1, ok);
 	if (back != NULL)
-		w2 = ab_text_width(back, px);
-	total = 2 * r + gap + w1 + (back != NULL ? sep + 2 * r + gap + w2 : 0);
-	x = (c->w - total) / 2;
-	ab_ui_cross(c, x + r, y + px / 2, r, ab_col_accent);
-	ab_text(c, x + 2 * r + gap, y, AB_UI_LEFT, ok, px, ab_col_text);
-	if (back != NULL) {
-		x += 2 * r + gap + w1 + sep;
-		ab_ui_circle(c, x + r, y + px / 2, r, ab_col_accent);
-		ab_text(c, x + 2 * r + gap, y, AB_UI_LEFT, back, px, ab_col_text);
-	}
+		ab_hint(c, &x, y, px, 0, back);
 }
 
 static void ab_draw_disc_picker(int n, int cur, int sel)
@@ -236,16 +272,20 @@ static void ab_draw_disc_picker(int n, int cur, int sel)
 	int r, gap, step, x0, cy, i;
 	char label[80];
 
-	menu_draw_begin(1, 1);
-	c = ab_canvas();
+	c = ab_screen_begin();
 	s = c.h / 720.0f;
-	ab_text(&c, c.w / 2, (int)(c.h * 0.15f), AB_UI_CENTER, ab_ui_str(AB_STR_CHANGE_DISC), (int)(40 * s), ab_col_text);
+	ab_text_shadow(&c, (int)(40 * s), (int)(40 * s), AB_UI_LEFT, ab_ui_str(AB_STR_CHANGE_DISC), (int)(36 * s), ab_col_text);
+	if (CdromId[0] != 0)
+		ab_text_shadow(&c, (int)(40 * s), (int)(86 * s), AB_UI_LEFT, get_cd_label(), (int)(22 * s), ab_col_dim);
 
 	r = (int)(62 * s);
 	gap = (int)(58 * s);
 	step = 2 * r + gap;
 	x0 = (c.w - (n * 2 * r + (n - 1) * gap)) / 2 + r;
-	cy = (int)(c.h * 0.50f);
+	cy = (int)(c.h * 0.46f);
+	/* the discs on a panel, as the menu's rows are */
+	ab_ui_fill(&c, x0 - r - (int)(60 * s), cy - r - (int)(50 * s), (n - 1) * step + 2 * r + (int)(120 * s),
+		   2 * r + (int)(130 * s), (int)(14 * s), ab_col_panel, 210);
 	for (i = 0; i < n; i++) {
 		int cx = x0 + i * step;
 		ab_ui_disc(&c, cx, cy, r, i == cur, i != sel);
@@ -264,10 +304,14 @@ static void ab_draw_message(const char *msg)
 	struct ab_canvas c;
 	float s;
 
-	menu_draw_begin(1, 1);
-	c = ab_canvas();
+	int px, w;
+
+	c = ab_screen_begin();
 	s = c.h / 720.0f;
-	ab_text(&c, c.w / 2, (int)(c.h * 0.44f), AB_UI_CENTER, msg, (int)(34 * s), ab_col_text);
+	px = (int)(32 * s);
+	w = ab_text_width(msg, px) + (int)(120 * s);
+	ab_ui_fill(&c, (c.w - w) / 2, (int)(c.h * 0.44f) - (int)(40 * s), w, px + (int)(80 * s), (int)(14 * s), ab_col_panel, 210);
+	ab_text(&c, c.w / 2, (int)(c.h * 0.44f), AB_UI_CENTER, msg, px, ab_col_text);
 	ab_footer(&c, ab_ui_str(AB_STR_OK), NULL);
 	menu_draw_end();
 }
@@ -336,11 +380,281 @@ static int ab_disc_screen(void)
 void ab_menu_change_disc(void)
 {
 	menu_leave_emu();
+	ab_menu_prepare_bg();
 	in_set_config_int(0, IN_CFG_BLOCKING, 1);
 	ab_disc_screen();
 	ab_wait_released();
 	in_set_config_int(0, IN_CFG_BLOCKING, 0);
 	menu_prepare_emu();
+}
+
+/* ---- the menu screen ----
+ *
+ * A 1280x720 design scaled by the canvas' height, the way the picker is: AutoBleem 2's launcher art
+ * behind everything (its logo bottom left, its bar along the bottom), the game's name and id top left
+ * with the selected row's help (or the last message) under them, the rows on a translucent panel on the
+ * right, the pad hints and the build on the bar. Without the art (no skin/) the same over plain navy. */
+
+/* the art at the canvas' size: ours as it is, libpicofe's background (what its own menus, the picker
+ * and the message screens draw over) darkened; made again when the window changed size. Every menu
+ * entry: menu_leave_emu() has just pasted the game's last frame into g_menubg_ptr, which is what the
+ * console showed as garbage - it is covered here. */
+static void ab_menu_prepare_bg(void)
+{
+	int w = g_menuscreen_w, h = g_menuscreen_h, i;
+
+	if (ab_bg == NULL || ab_bg_w != w || ab_bg_h != h) {
+		free(ab_bg);
+		ab_bg = calloc((size_t)w * h, 2);
+		if (ab_bg == NULL) {
+			ab_bg_w = ab_bg_h = 0;
+			return;
+		}
+		ab_bg_w = w;
+		ab_bg_h = h;
+		if (!ab_ui_background(ab_bg, w, h)) {
+			/* plain navy, a shade lighter towards the top */
+			for (i = 0; i < h; i++) {
+				unsigned short col = AB_RGB565(0x06, 0x1c + 0x14 * (h - i) / h, 0x4c + 0x20 * (h - i) / h);
+				int x;
+				for (x = 0; x < w; x++)
+					ab_bg[(size_t)i * w + x] = col;
+			}
+		}
+		menu_darken_bg(g_menubg_src_ptr, ab_bg, w * h, 0);
+	}
+	memcpy(g_menubg_ptr, g_menubg_src_ptr, (size_t)w * h * 2);
+}
+
+/* `s` word-wrapped to `width` pixels, at most `lines` lines; returns the lines drawn */
+static int ab_text_wrap(struct ab_canvas *c, int x, int y, const char *s, int px, int width, int lines, unsigned short col)
+{
+	char line[256];
+	int n = 0;
+
+	while (*s != 0 && n < lines) {
+		const char *p = s, *cut = NULL;
+		int len;
+		/* the longest prefix that fits, broken at a space; a word wider than the line goes whole */
+		for (;;) {
+			const char *q = strchr(p, ' ');
+			if (q == NULL)
+				q = p + strlen(p);
+			len = (int)(q - s);
+			if (len >= (int)sizeof(line))
+				len = sizeof(line) - 1;
+			memcpy(line, s, len);
+			line[len] = 0;
+			if (ab_text_width(line, px) > width && cut != NULL)
+				break;
+			cut = q;
+			if (*q == 0)
+				break;
+			p = q + 1;
+		}
+		len = (int)(cut - s);
+		if (len >= (int)sizeof(line))
+			len = sizeof(line) - 1;
+		memcpy(line, s, len);
+		line[len] = 0;
+		ab_text_shadow(c, x, y, AB_UI_LEFT, line, px, col);
+		y += px + px / 4;
+		n++;
+		s = cut;
+		while (*s == ' ')
+			s++;
+	}
+	return n;
+}
+
+static const char *ab_cpu_name(void)
+{
+	if (Config.Cpu == CPU_INTERPRETER)
+		return "interpreter";
+#if defined(LIGHTREC)
+	return "lightrec";
+#elif !defined(DRC_DISABLE)
+	return sizeof(void *) == 8 ? "ARM64 dynarec" : "ARM dynarec";
+#else
+	return "interpreter";
+#endif
+}
+
+static const char *ab_gpu_name(void)
+{
+	if (strcmp(Config.Gpu, "builtin_gpu") != 0)
+		return Config.Gpu;
+#if defined(BUILTIN_GPU_NEON)
+	return "NEON GPU";
+#elif defined(BUILTIN_GPU_PEOPS)
+	return "P.E.Op.S GPU";
+#else
+	return "Unai GPU";
+#endif
+}
+
+static void ab_menu_draw(const menu_entry *menu, int sel)
+{
+	struct ab_canvas c;
+	const menu_entry *ent, *ent_sel = NULL;
+	char buf[128], ltime_s[16];
+	time_t ltime;
+	float s;
+	int n, i, y, x, px, row_h, pad, panel_x, panel_y, panel_w, panel_h, x_name, x_val;
+
+	c = ab_screen_begin();
+	s = c.h / 720.0f;
+
+	/* top left: the game */
+	x = (int)(40 * s);
+	y = (int)(40 * s);
+	if (CdromId[0] != 0) {
+		ab_text_shadow(&c, x, y, AB_UI_LEFT, get_cd_label(), (int)(36 * s), ab_col_text);
+		y += (int)(46 * s);
+		ltime = time(NULL);
+		strftime(ltime_s, sizeof(ltime_s), "%H:%M", localtime(&ltime));
+		snprintf(buf, sizeof(buf), "%.9s  \xc2\xb7  %s  \xc2\xb7  %s  \xc2\xb7  %s", CdromId,
+			 Config.PsxType ? "PAL" : "NTSC", Config.HLE ? "HLE BIOS" : "BIOS", ltime_s);
+		ab_text_shadow(&c, x, y, AB_UI_LEFT, buf, (int)(22 * s), ab_col_dim);
+	} else {
+		ab_text_shadow(&c, x, y, AB_UI_LEFT, "pcsx-abnxt", (int)(36 * s), ab_col_text);
+	}
+
+	/* the rows, on the panel */
+	for (n = 0, ent = menu, i = 0; ent->name; ent++, i++) {
+		if (!ent->enabled)
+			continue;
+		if (i == sel)
+			ent_sel = ent;
+		n++;
+	}
+	px = (int)(24 * s);
+	row_h = (int)(34 * s);
+	pad = (int)(18 * s);
+	panel_w = (int)(560 * s);
+	panel_x = c.w - (int)(40 * s) - panel_w;
+	panel_y = (int)(40 * s);
+	panel_h = n * row_h + 2 * pad;
+	ab_ui_fill(&c, panel_x, panel_y, panel_w, panel_h, (int)(14 * s), ab_col_panel, 210);
+	x_name = panel_x + (int)(30 * s);
+	x_val = panel_x + panel_w - (int)(30 * s);
+	y = panel_y + pad;
+	for (ent = menu, i = 0; ent->name; ent++, i++) {
+		const char *name = ent->name, *val = NULL;
+		int offs = 0, is_sel = i == sel;
+
+		if (!ent->enabled)
+			continue;
+		if (is_sel)
+			ab_ui_fill(&c, panel_x + (int)(12 * s), y, panel_w - (int)(24 * s), row_h, (int)(8 * s), ab_col_row, 170);
+		if (name[0] == 0 && ent->generate_name != NULL)
+			name = ent->generate_name(ent->id, &offs);
+		switch (ent->beh) {
+		case MB_OPT_ONOFF:
+			val = me_read_onoff(ent) ? "ON" : "OFF";
+			break;
+		case MB_OPT_RANGE:
+			snprintf(buf, sizeof(buf), "%d", *(int *)ent->var);
+			val = buf;
+			break;
+		case MB_OPT_ENUM:
+			val = ((const char **)ent->data)[*(int *)ent->var];
+			break;
+		case MB_OPT_CUSTOM:
+		case MB_OPT_CUSTONOFF:
+		case MB_OPT_CUSTRANGE:
+			if (ent->generate_name != NULL)
+				val = ent->generate_name(ent->id, &offs);
+			break;
+		default:
+			break;
+		}
+		ab_text(&c, x_name, y + (row_h - px) / 2, AB_UI_LEFT, name, px, is_sel ? ab_col_text : ab_col_name);
+		if (val != NULL) {
+			int vx = x_val, vy = y + (row_h - px) / 2;
+			if (is_sel) {
+				/* the arrows of a value row, so Left/Right is obvious */
+				vx -= ab_text(&c, x_val, vy, AB_UI_RIGHT, ">", px, ab_col_accent) + (int)(8 * s);
+				vx -= ab_text(&c, vx, vy, AB_UI_RIGHT, val, px, ab_col_text) + (int)(8 * s);
+				ab_text(&c, vx, vy, AB_UI_RIGHT, "<", px, ab_col_accent);
+			} else {
+				ab_text(&c, vx, vy, AB_UI_RIGHT, val, px, ab_col_dim);
+			}
+		}
+		y += row_h;
+	}
+
+	/* the message of the moment, else the selected row's help, under the game's name */
+	x = (int)(40 * s);
+	y = (int)(150 * s);
+	if (menu_error_msg[0] != 0) {
+		ab_text_wrap(&c, x, y, menu_error_msg, (int)(24 * s), panel_x - x - (int)(40 * s), 2, ab_col_accent);
+		if (plat_get_ticks_ms() - menu_error_time > 2048)
+			menu_error_msg[0] = 0;
+	} else if (ent_sel != NULL && ent_sel->help != NULL) {
+		ab_text_wrap(&c, x, y, ent_sel->help, (int)(20 * s), panel_x - x - (int)(40 * s), 3, ab_col_dim);
+	}
+
+	/* the bar: the hints on its left, the build on its right */
+	ab_footer(&c, "Select", ready_to_go ? "Resume" : "Back");
+	px = (int)(17 * s);
+	x = c.w - (int)(40 * s);
+	snprintf(buf, sizeof(buf), "pcsx-abnxt %s", REV[0] != 0 ? REV : "(no version)");
+	ab_text(&c, x, (int)(636 * s), AB_UI_RIGHT, buf, px, ab_col_text);
+	snprintf(buf, sizeof(buf), "PCSX-ReARMed  \xc2\xb7  %s  \xc2\xb7  %s  \xc2\xb7  built %s", ab_cpu_name(), ab_gpu_name(), __DATE__);
+	ab_text(&c, x, (int)(660 * s), AB_UI_RIGHT, buf, px, ab_col_dim);
+
+	menu_draw_end();
+}
+
+/* me_loop_d() over our screen: the same keys, the same handler contract (1 from a handler = leave the
+ * menu, which is the game going on or the run ending) */
+static int ab_menu_run(menu_entry *menu, int *menu_sel)
+{
+	int ret = 0, inp, sel = *menu_sel, sel_max;
+
+	sel_max = me_count(menu) - 1;
+	if (sel_max < 0)
+		return 0;
+	while ((!menu[sel].enabled || !menu[sel].selectable) && sel < sel_max)
+		sel++;
+
+	ab_menu_draw(menu, sel);
+	ab_wait_released();
+	for (;;) {
+		ab_menu_draw(menu, sel);
+		inp = in_menu_wait(PBTN_UP|PBTN_DOWN|PBTN_LEFT|PBTN_RIGHT|
+			PBTN_MOK|PBTN_MBACK|PBTN_MENU|PBTN_L|PBTN_R, NULL, 70);
+		if (ab_console_power_off_requested || (inp & (PBTN_MENU|PBTN_MBACK)))
+			break;
+		if (inp & PBTN_UP) {
+			do {
+				if (--sel < 0)
+					sel = sel_max;
+			} while (!menu[sel].enabled || !menu[sel].selectable);
+		}
+		if (inp & PBTN_DOWN) {
+			do {
+				if (++sel > sel_max)
+					sel = 0;
+			} while (!menu[sel].enabled || !menu[sel].selectable);
+		}
+		if (inp & (PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) {
+			if (me_process(&menu[sel], (inp & (PBTN_RIGHT|PBTN_R)) ? 1 : 0, inp & (PBTN_L|PBTN_R)))
+				continue;
+		}
+		if (inp & (PBTN_MOK|PBTN_LEFT|PBTN_RIGHT|PBTN_L|PBTN_R)) {
+			/* a plain row takes Cross alone; a value row with a handler takes the arrows too */
+			if (menu[sel].handler != NULL && (menu[sel].beh != MB_NONE || (inp & PBTN_MOK))) {
+				ret = menu[sel].handler(menu[sel].id, inp);
+				if (ret)
+					break;
+				sel_max = me_count(menu) - 1;
+			}
+		}
+	}
+	*menu_sel = sel;
+	return ret;
 }
 
 static int ab_menu_pcsx_handler(int id, int keys)
@@ -367,9 +681,11 @@ static void ab_menu_loop_d(void)
 	me_enable(e_menu_ab, MA_AB_DISC,      ready_to_go && CdromId[0]);
 	me_enable(e_menu_ab, MA_AB_FILTER,    plat_target.hwfilters != NULL);
 
+	ab_ui_load(ab_opts.language);
+	ab_menu_prepare_bg();
 	do {
 		ab_aspect_sel = g_scaler == SCALE_FULLSCREEN;
-		me_loop_d(e_menu_ab, &sel, NULL, draw_frame_main);
+		ab_menu_run(e_menu_ab, &sel);
 		/* the row is a two-way switch over g_scaler; a scaler the row cannot name (custom, 1x1) is left
 		 * alone unless the row was moved */
 		if (ab_aspect_sel != (g_scaler == SCALE_FULLSCREEN))

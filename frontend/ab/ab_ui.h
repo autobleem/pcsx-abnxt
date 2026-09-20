@@ -56,6 +56,13 @@ void ab_ui_ring(struct ab_canvas *c, int cx, int cy, int r, int t, unsigned shor
 void ab_ui_cross(struct ab_canvas *c, int cx, int cy, int r, unsigned short rgb565);
 void ab_ui_circle(struct ab_canvas *c, int cx, int cy, int r, unsigned short rgb565);
 
+/* a filled rectangle with corners rounded by r, blended over the canvas at alpha (0..255) */
+void ab_ui_fill(struct ab_canvas *c, int x, int y, int w, int h, int r, unsigned short rgb565, int alpha);
+
+/* skin/ab_background.jpg (AutoBleem 2's launcher art, 1280x720) scaled to cover w x h pixels of `dst`
+ * (pitch w; bilinear, centred, the overhang cropped); 0 and `dst` untouched when there is no image */
+int ab_ui_background(unsigned short *dst, int w, int h);
+
 #define AB_RGB565(r, g, b) ((unsigned short)((((r) & 0xf8) << 8) | (((g) & 0xfc) << 3) | ((b) >> 3)))
 
 #endif

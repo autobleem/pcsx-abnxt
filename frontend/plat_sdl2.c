@@ -159,6 +159,18 @@ static void resize_cb(int w, int h)
   pl_update_layer_size(psx_w, psx_h, w, h);
   if (in_menu)
     g_menuscreen_ptr = menu_fb;
+  /* libpicofe's background buffers are the canvas' size too (menu_init() made them at the first size;
+   * before it they are NULL and it makes them); menu_leave_emu() writes g_menuscreen_w * h into them */
+  if (g_menubg_ptr != NULL) {
+    free(g_menubg_ptr);
+    free(g_menubg_src_ptr);
+    g_menubg_ptr = calloc(w * h, 2);
+    g_menubg_src_ptr = calloc(w * h, 2);
+    if (g_menubg_ptr == NULL || g_menubg_src_ptr == NULL) {
+      fprintf(stderr, "OOM\n");
+      exit(1);
+    }
+  }
 }
 
 /* every pad is its player's analog sticks too: in_adev[0]/[1] player 1's left/right, [2]/[3] player 2's */

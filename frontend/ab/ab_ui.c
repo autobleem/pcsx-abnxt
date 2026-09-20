@@ -14,6 +14,13 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
 #include "stb_truetype.h"
+/* the menu's background: a JPEG (a PNG would be six times the file for this art) */
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_STATIC
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#include "stb_image.h"
 
 #include "../../libpcsxcore/system.h"
 #include "../main.h"
@@ -388,4 +395,109 @@ void ab_ui_circle(struct ab_canvas *c, int cx, int cy, int r, unsigned short rgb
 {
 	ab_ui_ring(c, cx, cy, r, r * 0.18f > 1 ? (int)(r * 0.18f) : 1, rgb565);
 	ab_ui_ring(c, cx, cy, (int)(r * 0.55f), r * 0.2f > 1 ? (int)(r * 0.2f) : 1, rgb565);
+}
+
+void ab_ui_fill(struct ab_canvas *c, int x, int y, int w, int h, int r, unsigned short rgb565, int alpha)
+{
+	int cr, cg, cb, px, py;
+
+	if (alpha <= 0 || w <= 0 || h <= 0)
+		return;
+	if (r > w / 2)
+		r = w / 2;
+	if (r > h / 2)
+		r = h / 2;
+	unpack(rgb565, &cr, &cg, &cb);
+	for (py = 0; py < h; py++) {
+		int cy = py < r ? r - py : py >= h - r ? py - (h - r - 1) : 0;
+		for (px = 0; px < w; px++) {
+			int cx = px < r ? r - px : px >= w - r ? px - (w - r - 1) : 0;
+			int a = alpha;
+			/* a pixel in one of the corner squares: coverage by its distance from the corner's centre */
+			if (cx > 0 && cy > 0) {
+				float cov = edge((float)r, sqrtf((float)(cx * cx + cy * cy)));
+				if (cov <= 0)
+					continue;
+				a = (int)(alpha * cov);
+			}
+			plot(c, x + px, y + py, cr, cg, cb, a);
+		}
+	}
+}
+
+/* the file whole, NULL when it is not there */
+static unsigned char *read_file(const char *path, long *size)
+{
+	unsigned char *data;
+	FILE *f = fopen(path, "rb");
+
+	if (f == NULL)
+		return NULL;
+	fseek(f, 0, SEEK_END);
+	*size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	data = *size > 0 && *size <= 64 * 1024 * 1024 ? malloc(*size) : NULL;
+	if (data != NULL && fread(data, 1, *size, f) != (size_t)*size) {
+		free(data);
+		data = NULL;
+	}
+	fclose(f);
+	return data;
+}
+
+int ab_ui_background(unsigned short *dst, int w, int h)
+{
+	static int missing;
+	char path[MAXPATHLEN];
+	unsigned char *file, *img;
+	long size;
+	int iw, ih, n, x, y;
+	/* 16.16 fixed point: the source step per output pixel and the start of the crop */
+	int step, sx0, sy0;
+
+	if (missing || w <= 0 || h <= 0)
+		return 0;
+	emu_make_data_path(path, "skin/ab_background.jpg", sizeof(path));
+	file = read_file(path, &size);
+	if (file == NULL) {
+		SysPrintf("autobleem: no %s, the menu has a plain background\n", path);
+		missing = 1;
+		return 0;
+	}
+	img = stbi_load_from_memory(file, (int)size, &iw, &ih, &n, 3);
+	free(file);
+	if (img == NULL) {
+		SysPrintf("autobleem: %s: %s\n", path, stbi_failure_reason());
+		missing = 1;
+		return 0;
+	}
+	/* cover: the axis that needs more scaling sets the factor, the other overhangs and is cropped */
+	if ((long)iw * h > (long)ih * w)
+		step = (ih << 16) / h;
+	else
+		step = (iw << 16) / w;
+	sx0 = ((iw << 16) - step * w) / 2;
+	sy0 = ((ih << 16) - step * h) / 2;
+	for (y = 0; y < h; y++) {
+		int sy = sy0 + y * step, iy = sy >> 16, fy = (sy >> 8) & 0xff;
+		const unsigned char *r0, *r1;
+		if (iy < 0) { iy = 0; fy = 0; }
+		if (iy >= ih - 1) { iy = ih - 1; fy = 0; }
+		r0 = img + (size_t)iy * iw * 3;
+		r1 = iy + 1 < ih ? r0 + iw * 3 : r0;
+		for (x = 0; x < w; x++) {
+			int sx = sx0 + x * step, ix = sx >> 16, fx = (sx >> 8) & 0xff, ix1, c, rgb[3];
+			if (ix < 0) { ix = 0; fx = 0; }
+			if (ix >= iw - 1) { ix = iw - 1; fx = 0; }
+			ix1 = ix + 1 < iw ? ix + 1 : ix;
+			for (c = 0; c < 3; c++) {
+				int top = r0[ix * 3 + c] * (256 - fx) + r0[ix1 * 3 + c] * fx;
+				int bot = r1[ix * 3 + c] * (256 - fx) + r1[ix1 * 3 + c] * fx;
+				rgb[c] = (top * (256 - fy) + bot * fy) >> 16;
+			}
+			dst[(size_t)y * w + x] = AB_RGB565(rgb[0], rgb[1], rgb[2]);
+		}
+	}
+	stbi_image_free(img);
+	return 1;
 }

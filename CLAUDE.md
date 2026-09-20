@@ -28,8 +28,26 @@ archived on GitHub - which only makes sense after that pass. Out of scope by dec
 build, Sony's `UI_INTEGRATION`/`.sts`/the Pandora-Maemo-Caanoo platforms, GPU/SPU features beyond
 upstream's; a "which disc" picker in the launcher's resume menu and the `.m3u` hand-over are follow-ups.
 
+**The menu's look** (2026-09-20 night, `feature/menu-improvements`): the Home-button menu is drawn by
+`ab_menu.c` itself (`ab_menu_draw`/`ab_menu_run` - libpicofe's `menu_entry` rows and its handler contract,
+`me_loop_d`'s keys, but our screen): AutoBleem 2's launcher art (`skin/ab_background.jpg`, the ab2
+theme's `AB-EvoBack.jpg` at 1280x720, decoded by **stb_image** - vendored `frontend/ab/stb_image.h`,
+JPEG+PNG only - and scaled to cover the canvas by `ab_ui_background`; plain navy without the file), the
+game's name and id top left with the selected row's help or the last message under them, the rows on a
+translucent panel on the right (a value row shows its value with `< >` arrows when selected - Filter
+became one, `mee_cust_h` over `plat_target.hwfilters`), the pad hints and the build (`REV`, the CPU
+engine, the GPU, `__DATE__`) on the art's bar. Everything is a 1280x720 design scaled by the canvas'
+height, in the ab_ui font. **The paused game's frame is not shown any more**: `menu_leave_emu()`'s paste
+of `pl_vout_buf` at `last_vout_w/h` was garbage on the console whenever the GPU rendered at another size
+than it reported (the 2x enhancement, say) - `ab_menu_prepare_bg()` covers it at every menu entry and
+gives libpicofe's `g_menubg_*` a darkened copy of the same art, which is what the PCSX menu beneath and
+its pages draw over, in upstream's own 8x10 font. `plat_sdl2.c`'s `resize_cb` re-allocates the
+`g_menubg_*` buffers with the canvas (F11 on a PC used to read past them). The picker and the message
+screens draw on the same screen (`ab_screen_begin`, the discs on a panel, the hints on the bar).
+`make_rpi*.sh`'s dist step ships `skin/` + `lang/` like `ci/build.sh`'s.
+
 **The disc picker and the emulator's own language** (2026-09-20, phase 5 complete): the Open button and
-the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the paused game - the set's discs in
+the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the menu's screen - the set's discs in
 a row (drawn in code, `ab_ui_disc`: the one in the drive in AutoBleem's cyan, the focused one bright with
 a ring, the others dimmed), "Disc n" under each, Cross/Circle hints; Left/Right, Cross puts the focused
 disc in through the lid (`ab_disc_insert`), Circle backs out, the focus starts on the *next* disc as
@@ -126,9 +144,10 @@ takes it); the menu's Exit and the window's close leave the live state. `AB_NO_A
 Linux only, ending at once without the files). `ab_disc`: the disc set (multi-disc PBP, an `.m3u`, or the
 folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
 start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring. `ab_menu.c`:
-the in-game menu (Resume, Quick save/load = slot 2, Change disc, Toggle filter, PCSX menu = upstream's
-whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as `autobleem.cfg`, Exit), `#include`d into
-`frontend/menu.c` like libpicofe's menu.c because the menu machinery is static there. Player 2's sticks:
+the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Screen, Scanlines, the
+controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
+`autobleem.cfg`, Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
+libpicofe's menu.c because the menu machinery is static there. Player 2's sticks:
 `in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
 
 Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`

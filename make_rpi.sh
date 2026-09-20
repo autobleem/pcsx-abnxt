@@ -33,6 +33,10 @@ mkdir -p build_rpi/dist/plugins
 for so in build_rpi/plugins/*.so; do
     "$STRIP" -o "build_rpi/dist/plugins/$(basename "$so")" "$so"
 done
+# the emulator's own screens: their font, the menu's art and the launcher's languages (frontend/ab/ab_ui.h)
+mkdir -p build_rpi/dist/skin build_rpi/dist/lang
+cp frontend/ab/skin/* build_rpi/dist/skin/
+cp frontend/ab/lang/*.txt build_rpi/dist/lang/
 echo "==> build_rpi/dist:"
 ls -l build_rpi/dist build_rpi/dist/plugins
 
