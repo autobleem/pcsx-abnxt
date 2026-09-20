@@ -1,0 +1,11 @@
+# Only what is ours - upstream files keep their line endings (33 of them are CRLF), so an upstream
+# merge never sees a renormalisation.
+*.sh text eol=lf
+CMakeLists.txt text eol=lf
+*.cmake text eol=lf
+docs/** text eol=lf
+docs/reference/*.patch -text
+frontend/ab/** text eol=lf
+toolchains/** text eol=lf
+ci/** text eol=lf
+CLAUDE.md text eol=lf
