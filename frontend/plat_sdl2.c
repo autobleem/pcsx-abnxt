@@ -35,6 +35,7 @@
 #include "main.h"
 #include "plat.h"
 #include "revision.h"
+#include "ab/ab_config.h"
 
 /* the keyboard: the same keys upstream's SDL 1.2 platform binds, by scancode */
 static const struct in_default_bind in_sdl2_defbinds[] = {
@@ -200,7 +201,7 @@ void plat_init(void)
 #if defined(__arm__) || defined(__aarch64__)
   fullscreen = 1;	/* the console and the Pi: the whole display, whatever its mode */
 #else
-  fullscreen = plat_target.vout_fullscreen;
+  fullscreen = plat_target.vout_fullscreen || ab_opts.fullscreen;	/* -fullscreen: the launcher's rule */
 #endif
   ret = plat_sdl2_init("PCSX-ReARMed " REV, 1280, 720, fullscreen, g_opts & OPT_VSYNC);
   if (ret != 0)
@@ -248,6 +249,8 @@ static void check_fullscreen(void)
    * the mouse pointer back */
   plat_target.vout_fullscreen = 1;
 #endif
+  if (ab_opts.fullscreen)
+    plat_target.vout_fullscreen = 1;	/* started with -fullscreen: a cfg's vout_fullscreen = 0 does not undo it */
   if (plat_target.vout_fullscreen != fullscreen_old) {
     plat_sdl2_set_fullscreen(plat_target.vout_fullscreen);
     plat_target.vout_fullscreen = fullscreen_old = plat_sdl2_is_fullscreen();

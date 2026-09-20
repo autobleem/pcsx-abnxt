@@ -30,7 +30,57 @@ struct ab_options ab_opts = {
 	.region = 4,
 	.enter = 1,
 	.display = 1,
+	.fullscreen = 0,
+	.dotdir = NULL,
+	.biosdir = NULL,
 };
+
+static int take_string(const char *name, const char **value, int argc, char *argv[], int *i)
+{
+	if (strcmp(argv[*i], name) != 0)
+		return 0;
+	if (*i + 1 >= argc) {
+		fprintf(stderr, "%s needs a value\n", name);
+		return 1;
+	}
+	*value = argv[++*i];
+	return 1;
+}
+
+static int take_flag(const char *name, int *value, char *argv[], int *i)
+{
+	if (strcmp(argv[*i], name) != 0)
+		return 0;
+	*value = 1;
+	return 1;
+}
+
+void ab_make_path(char *buf, size_t size, const char *home, const char *dir, const char *fname)
+{
+	size_t dotlen = strlen(PCSX_DOT_DIR);
+
+	if (ab_opts.dotdir != NULL && strncmp(dir, PCSX_DOT_DIR, dotlen) == 0) {
+		/* the profile folder given outright: "/.pcsx/" and what is under it become <dotdir>/... */
+		snprintf(buf, size, "%s/%s%s", ab_opts.dotdir, dir + dotlen, fname ? fname : "");
+		return;
+	}
+	if (fname)
+		snprintf(buf, size, "%s%s%s", home, dir, fname);
+	else
+		snprintf(buf, size, "%s%s", home, dir);
+}
+
+const char *ab_gameid_format(const char *fmt, char *out, size_t size, const char *home)
+{
+	size_t dotlen = strlen(PCSX_DOT_DIR);
+
+	if (ab_opts.dotdir != NULL && strncmp(fmt, "%s" PCSX_DOT_DIR, 2 + dotlen) == 0) {
+		snprintf(out, size, "%%s/%s", fmt + 2 + dotlen);
+		return ab_opts.dotdir;
+	}
+	snprintf(out, size, "%s", fmt);
+	return home;
+}
 
 static int take_int(const char *name, int *value, int lo, int hi, int argc, char *argv[], int *i)
 {
@@ -66,13 +116,25 @@ int ab_args_take(int argc, char *argv[])
 		    || take_int("-lang", &ab_opts.lang, 1, 13, argc, argv, &i)
 		    || take_int("-region", &ab_opts.region, 1, 4, argc, argv, &i)
 		    || take_int("-enter", &ab_opts.enter, 0, 2, argc, argv, &i)
-		    || take_int("-display", &ab_opts.display, 0, 1, argc, argv, &i))
+		    || take_int("-display", &ab_opts.display, 0, 1, argc, argv, &i)
+		    || take_flag("-fullscreen", &ab_opts.fullscreen, argv, &i)
+		    || take_string("-dotdir", &ab_opts.dotdir, argc, argv, &i)
+		    || take_string("-biosdir", &ab_opts.biosdir, argc, argv, &i))
 			continue;
 		argv[out++] = argv[i];
 	}
 	argv[out] = NULL;
-	printf("autobleem: filter=%d ratio=%d lang=%d region=%d\n",
-		ab_opts.filter, ab_opts.ratio, ab_opts.lang, ab_opts.region);
+	/* a trailing separator on the folders would double up in the paths built from them */
+	if (ab_opts.dotdir != NULL) {
+		char *d = strdup(ab_opts.dotdir);
+		size_t n = strlen(d);
+		while (n > 1 && (d[n - 1] == '/' || d[n - 1] == '\\'))
+			d[--n] = 0;
+		ab_opts.dotdir = d;
+	}
+	printf("autobleem: filter=%d ratio=%d lang=%d region=%d fullscreen=%d dotdir=%s biosdir=%s\n",
+		ab_opts.filter, ab_opts.ratio, ab_opts.lang, ab_opts.region, ab_opts.fullscreen,
+		ab_opts.dotdir ? ab_opts.dotdir : "-", ab_opts.biosdir ? ab_opts.biosdir : "-");
 	return out;
 }
 

@@ -112,6 +112,9 @@ static void set_default_paths(void)
 	// prefer bios in working dir for compatibility
 	if (!strcmp(home, ".") && !stat("bios", &st))
 		strcpy(Config.BiosDir, "bios");
+	// AutoBleem's -biosdir names it outright
+	if (ab_opts.biosdir != NULL)
+		snprintf(Config.BiosDir, sizeof(Config.BiosDir), "%s", ab_opts.biosdir);
 	// AutoBleem's launch scripts put plugins/ next to .pcsx/ and bios/ in the working dir as well
 	if (!strcmp(home, ".") && !stat("plugins", &st))
 		strcpy(Config.PluginsDir, "plugins");
@@ -543,11 +546,8 @@ static const char *get_home_dir(void)
 
 void emu_make_path(char *buf, size_t size, const char *dir, const char *fname)
 {
-	const char *home = get_home_dir();
-	if (fname)
-		snprintf(buf, size, "%s%s%s", home, dir, fname);
-	else
-		snprintf(buf, size, "%s%s", home, dir);
+	// AutoBleem's -dotdir puts the profile wherever the launcher says (ab_config.c)
+	ab_make_path(buf, size, get_home_dir(), dir, fname);
 }
 
 void emu_make_data_path(char *buff, const char *end, int size)
@@ -589,8 +589,9 @@ static void check_memcards(void)
 	int i;
 
 	for (i = 1; i <= PCSX_MEMCARD_COUNT; i++) {
-		snprintf(buf, sizeof(buf), "%s%scard%d.mcd",
-			get_home_dir(), MEMCARD_DIR, i);
+		char name[32];
+		snprintf(name, sizeof(name), "card%d.mcd", i);
+		MAKE_PATH(buf, MEMCARD_DIR, name);
 
 		f = fopen(buf, "rb");
 		if (f == NULL) {
@@ -613,8 +614,9 @@ int main(int argc, char *argv[])
 	int loadst = 0;
 	int i;
 
-	emu_core_preinit();
+	// AutoBleem's options first: -dotdir/-biosdir must be known when preinit lays the default paths out
 	argc = ab_args_take(argc, argv);
+	emu_core_preinit();
 
 	// read command line options
 	for (i = 1; i < argc; i++) {
@@ -694,8 +696,7 @@ int main(int argc, char *argv[])
 		// FIXME: this recovery doesn't work, just delete bad config and bail out
 		// SysMessage("could not load plugins, retrying with defaults\n");
 		set_default_paths();
-		snprintf(path, sizeof(path), "%s" PCSX_DOT_DIR "%s",
-			get_home_dir(), cfgfile_basename);
+		MAKE_PATH(path, PCSX_DOT_DIR, cfgfile_basename);
 		remove(path);
 		SysMessage("Failed loading plugins!");
 		return 1;
@@ -816,7 +817,12 @@ static int get_gameid_filename(char *buf, int size, const char *fmt, int i) {
 		else
 			continue;
 
-	snprintf(buf, size, fmt, get_home_dir(), trimlabel, CdromId, i);
+	{
+		// AutoBleem's -dotdir: fmt is "%s" PCSX_DOT_DIR "<sub>/<name>" - the profile part rewritten
+		char fmt2[MAXPATHLEN];
+		const char *home = ab_gameid_format(fmt, fmt2, sizeof(fmt2), get_home_dir());
+		snprintf(buf, size, fmt2, home, trimlabel, CdromId, i);
+	}
 
 	return 0;
 }

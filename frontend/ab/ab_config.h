@@ -4,6 +4,15 @@
  *
  *   pcsx-ab -filter F -ratio R -lang L -region N -enter E [-display D] [-load 1] -cdfile <image>
  *
+ * and, for a launcher that cannot lay the run directory out with symlinks (the Windows product starts
+ * the emulator directly - there is no launch.sh, and no symlinks on a FAT stick):
+ *
+ *   -dotdir DIR    the profile folder itself - what .pcsx/ in the working directory is otherwise:
+ *                  pcsx.cfg, memcards/, sstates/, screenshots/ and the launcher's files live there
+ *   -biosdir DIR   the BIOS folder (bios/ in the working directory otherwise)
+ *   -fullscreen    the whole display, whatever a pcsx.cfg's vout_fullscreen says (a desktop build
+ *                  opens a window by default; the console and the Pi are full screen regardless)
+ *
  * (C) AutoBleem team, 2026
  *
  * This work is licensed under the terms of the GNU GPLv2 or later.
@@ -19,12 +28,25 @@ struct ab_options {
 	int region;	/* -region: accepted for the launch script's sake, the disc decides */
 	int enter;	/* -enter: accepted, always 1 from the launcher */
 	int display;	/* -display: accepted, unused */
+	int fullscreen;	/* -fullscreen: the display is ours, no window */
+	const char *dotdir;	/* -dotdir: the profile folder, NULL = <home>/.pcsx as upstream has it */
+	const char *biosdir;	/* -biosdir: the BIOS folder, NULL = the profile's bios/ (or ./bios) */
 };
 extern struct ab_options ab_opts;
 
 /* Takes AutoBleem's options out of argv before main() parses the rest (it treats an unknown argument as
  * an executable to load). Returns the new argc. */
 int ab_args_take(int argc, char *argv[]);
+
+/* A profile path with -dotdir honoured: `dir` is one of upstream's PCSX_DOT_DIR-rooted constants
+ * ("/.pcsx/memcards/" ...), `fname` may be NULL. Without -dotdir it is what emu_make_path always was:
+ * <home><dir><fname>. main.c's emu_make_path calls this. */
+void ab_make_path(char *buf, size_t size, const char *home, const char *dir, const char *fname);
+
+/* The same for main.c's get_gameid_filename formats, "%s" PCSX_DOT_DIR "<sub>/<name format>": with
+ * -dotdir the format comes back in `out` as "%s/<sub>/<name format>" and the returned home is the dotdir;
+ * without it `out` is `fmt` as it was and `home` is returned. */
+const char *ab_gameid_format(const char *fmt, char *out, size_t size, const char *home);
 
 /* After menu_load_config(is_game) parsed a config file: "Bios = SET_BY_PCSX" becomes the per-region BIOS
  * files AutoBleem's System/Bios holds (romJP.bin for Japan, romw.bin for the rest - the core then picks by
