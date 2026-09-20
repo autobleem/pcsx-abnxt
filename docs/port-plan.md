@@ -202,7 +202,9 @@ owner at the console). The repo's `CLAUDE.md` is updated in the same commit as a
    pcsx-ab's), `.gitattributes` (LF), `.clang-format` not applied to upstream files (they are notaz's
    style; ours under `frontend/ab/` follow it).
 
-**Phase 1 - the build, no features** (`feature/cmake-build`)
+**Phase 1 - the build, no features** (`feature/cmake-build`) - **done 2026-09-20**: Windows plays (lightrec +
+C-SIMD gpu_neon over sdl12-compat), the two Pis and the console link headless (`PCSXAB_PLATFORM=headless`,
+no SDL 1.2 in any sysroot - the game smoke runs there move to phase 2), gcc-6 needed nothing.
 
 4. `CMakeLists.txt` over r26: the core, the dynarec per arch (ari64 arm/arm64, lightrec + lightning on
    x86), gpu_neon asm/SIMD + peops + unai, dfsound, cdriso with libchdr (`deps/`, static), `MMAP_WIN32`,

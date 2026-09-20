@@ -76,6 +76,19 @@ enum sched_action emu_action, emu_action_old;
 char hud_msg[64];
 int hud_new_msg;
 
+/* "/..." everywhere; on Windows also "C:\..." / "C:/..." */
+static int path_is_absolute(const char *p)
+{
+#ifdef _WIN32
+	if (((p[0] >= 'A' && p[0] <= 'Z') || (p[0] >= 'a' && p[0] <= 'z')) && p[1] == ':'
+	    && (p[2] == '/' || p[2] == '\\'))
+		return 1;
+	if (p[0] == '\\')
+		return 1;
+#endif
+	return p[0] == '/';
+}
+
 void set_cd_image(const char *fname)
 {
 	SetIsoFile(fname);
@@ -603,7 +616,7 @@ int main(int argc, char *argv[])
 		else if (!strcmp(argv[i], "-cdfile")) {
 			if (i+1 >= argc) break;
 			strncpy(isofilename, argv[++i], MAXPATHLEN);
-			if (isofilename[0] != '/') {
+			if (!path_is_absolute(isofilename)) {
 				getcwd(path, MAXPATHLEN);
 				if (strlen(path) + strlen(isofilename) + 1 < MAXPATHLEN) {
 					strcat(path, "/");
@@ -636,7 +649,7 @@ int main(int argc, char *argv[])
 			 return 0;
 		} else {
 			strncpy(file, argv[i], MAXPATHLEN);
-			if (file[0] != '/') {
+			if (!path_is_absolute(file)) {
 				getcwd(path, MAXPATHLEN);
 				if (strlen(path) + strlen(file) + 1 < MAXPATHLEN) {
 					strcat(path, "/");
