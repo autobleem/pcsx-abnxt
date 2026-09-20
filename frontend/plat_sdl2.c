@@ -121,7 +121,9 @@ static const char * const controller_db_files[] = {
   NULL
 };
 
-static const char *hwfilters[] = { "linear", "nearest", NULL };
+/* plat_target.hwfilter indexes this; the values are PLAT_SDL2_FILTER_* (Off = nearest, Linear = bilinear,
+ * Sharp = whole-factor prescale + bilinear); the launcher's -filter 0/1 is Off/Linear */
+static const char *hwfilters[] = { "Off", "Linear", "Sharp", NULL };
 
 static int psx_w = 256, psx_h = 240;	/* the emulator's output as plat_gvideo_set_mode() was told it */
 static void *shadow_fb;			/* the frame the GPU plugin draws into, RGB565 */
@@ -276,7 +278,7 @@ void *plat_gvideo_flip(void)
   // the scanlines are drawn over the presented frame, one per emulated row (menu: Scanlines 1-3 is the
   // band's thickness, Scanline brightness how much of the picture shows through)
   plat_sdl2_set_scanlines(scanlines ? pl_vout_raw_h : 0, scanlines, (100 - scanline_level) * 255 / 100);
-  plat_sdl2_present(shadow_fb, psx_w, psx_h, psx_w, &dst, plat_target.hwfilter == 0);
+  plat_sdl2_present(shadow_fb, psx_w, psx_h, psx_w, &dst, plat_target.hwfilter);
   return shadow_fb;
 }
 
@@ -305,7 +307,7 @@ void plat_video_menu_begin(void)
 
 void plat_video_menu_end(void)
 {
-  plat_sdl2_present(menu_fb, g_menuscreen_w, g_menuscreen_h, g_menuscreen_pp, NULL, 1);
+  plat_sdl2_present(menu_fb, g_menuscreen_w, g_menuscreen_h, g_menuscreen_pp, NULL, PLAT_SDL2_FILTER_LINEAR);
   g_menuscreen_ptr = NULL;
 }
 
