@@ -31,7 +31,7 @@ enum {
 static int ab_menu_handler(int id, int keys);
 static int ab_menu_pcsx_handler(int id, int keys);
 
-static const char h_ab_filter[] = "Bilinear or nearest scaling of the picture";
+static const char h_ab_filter[] = "Off = plain pixels, Linear = smoothed, Sharp = crisp pixels without shimmer";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
 static const char h_ab_savecfg[] = "Keeps today's settings for this game in AutoBleem";
 static const char h_ab_scanlines[] = "Dark lines between the picture's rows, 1-3 rows thick;"
@@ -52,7 +52,7 @@ static menu_entry e_menu_ab[] =
 	mee_handler_id("Quick save",               MA_AB_QUICKSAVE,     ab_menu_handler),
 	mee_handler_id("Quick load",               MA_AB_QUICKLOAD,     ab_menu_handler),
 	mee_handler_id("Change disc",              MA_AB_DISC,          ab_menu_handler),
-	mee_handler_id_h("Toggle filter",          MA_AB_FILTER,        ab_menu_handler, h_ab_filter),
+	mee_handler_id_h("Filter",                 MA_AB_FILTER,        ab_menu_handler, h_ab_filter),
 	mee_enum_h    ("Screen",                   0,                   ab_aspect_sel, men_ab_aspect, h_ab_aspect),
 	mee_enum_h    ("Scanlines",                MA_OPT_SCANLINES,    scanlines, men_scanlines, h_ab_scanlines),
 	mee_range_h   ("Scanline brightness",      MA_OPT_SCANLINE_LEVEL, scanline_level, 0, 100, h_scanline_l),
@@ -135,7 +135,9 @@ static int ab_menu_handler(int id, int keys)
 	case MA_AB_FILTER:
 		if (plat_target.hwfilters == NULL)
 			break;
-		plat_target.hwfilter = !plat_target.hwfilter;
+		plat_target.hwfilter++;
+		if (plat_target.hwfilters[plat_target.hwfilter] == NULL)
+			plat_target.hwfilter = 0;
 		snprintf(msg, sizeof(msg), "Filter: %s", plat_target.hwfilters[plat_target.hwfilter]);
 		menu_update_msg(msg);
 		break;

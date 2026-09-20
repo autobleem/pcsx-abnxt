@@ -61,7 +61,7 @@ int ab_args_take(int argc, char *argv[])
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	for (i = 1; i < argc; i++) {
-		if (take_int("-filter", &ab_opts.filter, 0, 1, argc, argv, &i)
+		if (take_int("-filter", &ab_opts.filter, 0, 2, argc, argv, &i)
 		    || take_int("-ratio", &ab_opts.ratio, 0, 1, argc, argv, &i)
 		    || take_int("-lang", &ab_opts.lang, 1, 13, argc, argv, &i)
 		    || take_int("-region", &ab_opts.region, 1, 4, argc, argv, &i)
@@ -92,9 +92,10 @@ void ab_config_loaded(int is_game)
 
 	/* the launcher's per-launch choices beat the file's */
 	if (plat_target.hwfilters != NULL)
-		plat_target.hwfilter = ab_opts.filter ? 0 : 1;	/* hwfilters[] = { "linear", "nearest" } */
+		plat_target.hwfilter = ab_opts.filter;	/* hwfilters[] = { "Off", "Linear", "Sharp" }: the launcher sends 0/1 */
 	g_scaler = ab_opts.ratio ? SCALE_FULLSCREEN : SCALE_4_3;
 	fprintf(stderr, "autobleem: %s config: filter=%s ratio=%s boot logo=%s scanlines=%d\n",
-		is_game ? "game" : "global", plat_target.hwfilter == 0 ? "linear" : "nearest",
+		is_game ? "game" : "global",
+		plat_target.hwfilters != NULL ? plat_target.hwfilters[plat_target.hwfilter] : "-",
 		ab_opts.ratio ? "16:9" : "4:3", Config.SlowBoot ? "shown" : "skipped", scanlines);
 }
