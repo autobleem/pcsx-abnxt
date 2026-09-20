@@ -193,6 +193,7 @@ void plat_init(void)
 
   plat_sdl2_quit_cb = quit_cb;
   plat_sdl2_resize_cb = resize_cb;
+  pl_scanlines_by_plat = 1;
 
 #if defined(__arm__) || defined(__aarch64__)
   fullscreen = 1;	/* the console and the Pi: the whole display, whatever its mode */
@@ -272,6 +273,9 @@ void *plat_gvideo_flip(void)
   SDL_Rect dst = { g_layer_x, g_layer_y, g_layer_w, g_layer_h };
 
   check_fullscreen();
+  // the scanlines are drawn over the presented frame, one per emulated row (menu: Scanlines 1-3 is the
+  // band's thickness, Scanline brightness how much of the picture shows through)
+  plat_sdl2_set_scanlines(scanlines ? pl_vout_raw_h : 0, scanlines, (100 - scanline_level) * 255 / 100);
   plat_sdl2_present(shadow_fb, psx_w, psx_h, psx_w, &dst, plat_target.hwfilter == 0);
   return shadow_fb;
 }
