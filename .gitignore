@@ -38,6 +38,7 @@ psx_gpu_offsets_update
 # our own tools/ files (upstream ignores the directory; a file under an ignored directory cannot be
 # un-ignored, hence the /tools/* form above)
 !/tools/win_drive.ps1
+!/tools/make_packages.sh
 
 /dist/
 /build_win_rel/
