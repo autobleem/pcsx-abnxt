@@ -345,6 +345,13 @@ if (PCSXAB_BUILTIN_GPU STREQUAL "neon")
         list(APPEND PCSXAB_SOURCES plugins/gpu_neon/psx_gpu/psx_gpu_simd.c)
         set_source_files_properties(plugins/gpu_neon/psx_gpu_if.c plugins/gpu_neon/psx_gpu/psx_gpu_simd.c PROPERTIES
             COMPILE_DEFINITIONS "NEON_BUILD;TEXTURE_CACHE_4BPP;TEXTURE_CACHE_8BPP;SIMD_BUILD")
+        # the C SIMD code is SSE2 on x86: a 32-bit build at Debian's i686 baseline (AutoBleem's PC stick)
+        # gets SSE2 for these two files alone - the GPU then wants a Pentium 4 / Athlon 64 or later, the
+        # rest of the emulator stays i686
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES "^i[3-6]86$")
+            set_property(SOURCE plugins/gpu_neon/psx_gpu_if.c plugins/gpu_neon/psx_gpu/psx_gpu_simd.c
+                APPEND PROPERTY COMPILE_OPTIONS -msse2)
+        endif()
     endif()
 elseif (PCSXAB_BUILTIN_GPU STREQUAL "peops")
     list(APPEND PCSXAB_SOURCES plugins/dfxvideo/gpulib_if.c)
@@ -465,6 +472,9 @@ if (PCSXAB_PLUGINS)
         else()
             target_sources(gpu_neon PRIVATE plugins/gpu_neon/psx_gpu/psx_gpu_simd.c)
             target_compile_definitions(gpu_neon PRIVATE SIMD_BUILD)
+            if (CMAKE_SYSTEM_PROCESSOR MATCHES "^i[3-6]86$")
+                target_compile_options(gpu_neon PRIVATE -msse2) # see the built-in GPU above
+            endif()
         endif()
     endif()
 
