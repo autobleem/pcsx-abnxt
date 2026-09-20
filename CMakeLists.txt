@@ -130,6 +130,8 @@ endif()
 # ---------------------------------------------------------------------------------------------------------
 add_compile_options(-Wall -ffast-math -ffunction-sections -fdata-sections -Wno-unused-result)
 add_compile_definitions(_REENTRANT _FILE_OFFSET_BITS=64 DISABLE_MEM_LUTS=0)
+# AutoBleem's memory-card sets are one card, swapped in as card1.mcd; card2 stays for a second player's
+add_compile_definitions(PCSX_MEMCARD_COUNT=2)
 if (WIN32)
     # deps/mman is mmap() for MinGW; the CRT has no posix_memalign
     # NO_DYLIB is upstream's own Windows recipe (Makefile.libretro): the plugins are built in and
@@ -213,6 +215,8 @@ set(PCSXAB_SOURCES
     # frontend
     frontend/cspace.c frontend/plugin_lib.c frontend/plugin.c frontend/main.c frontend/menu.c
     frontend/libpicofe/input.c frontend/libpicofe/readpng.c frontend/libpicofe/fonts.c
+    # AutoBleem's own (docs/port-plan.md: new files, hooks only in upstream's)
+    frontend/ab/ab_config.c frontend/ab/ab_session.c
 )
 set_source_files_properties(frontend/libpicofe/input.c PROPERTIES COMPILE_OPTIONS -Wno-array-bounds)
 set_source_files_properties(libpcsxcore/psxbios.c PROPERTIES COMPILE_OPTIONS -Wno-nonnull)
@@ -314,16 +318,17 @@ else()
     add_compile_definitions(DRC_DISABLE)
 endif()
 
-# the multithreaded features (configure's --enable-threads, on for the generic platform)
+# the thread library is always in (menu.c shows the core count it reports); the multithreaded features
+# themselves (configure's --enable-threads, on for the generic platform) are the option
+list(APPEND PCSXAB_SOURCES frontend/pcsxr-threads.c deps/libretro-common/features/features_cpu.c)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/libretro-common/include)
+set_source_files_properties(deps/libretro-common/features/features_cpu.c PROPERTIES COMPILE_OPTIONS -w)
 if (PCSXAB_THREADS)
-    list(APPEND PCSXAB_SOURCES frontend/pcsxr-threads.c deps/libretro-common/features/features_cpu.c)
-    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/deps/libretro-common/include)
     list(APPEND PCSXAB_SOURCES plugins/gpulib/gpu_async.c)
     # the Makefile sets these per object (cdrom-async, gpulib, dfsound, menu); on the whole executable they
     # reach the same files and nothing else looks at them. Not on the source files: gpulib's are shared
     # with the plugins' gpulib_pic, which upstream builds without the async code.
     set(_pcsxab_thread_defs HAVE_RTHREADS USE_ASYNC_CDROM USE_ASYNC_GPU USE_ASYNC_SPU)
-    set_source_files_properties(deps/libretro-common/features/features_cpu.c PROPERTIES COMPILE_OPTIONS -w)
 endif()
 
 # built-in gpu

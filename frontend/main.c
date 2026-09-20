@@ -34,6 +34,8 @@
 #include "../plugins/dfsound/spu_config.h"
 #include "arm_features.h"
 #include "revision.h"
+#include "ab/ab_config.h"
+#include "ab/ab_session.h"
 
 #if defined(__EMSCRIPTEN__)
 #define DO_CPU_CHECKS 0
@@ -577,7 +579,7 @@ static void check_memcards(void)
 	FILE *f;
 	int i;
 
-	for (i = 1; i <= 9; i++) {
+	for (i = 1; i <= PCSX_MEMCARD_COUNT; i++) {
 		snprintf(buf, sizeof(buf), "%s%scard%d.mcd",
 			get_home_dir(), MEMCARD_DIR, i);
 
@@ -603,6 +605,7 @@ int main(int argc, char *argv[])
 	int i;
 
 	emu_core_preinit();
+	argc = ab_args_take(argc, argv);
 
 	// read command line options
 	for (i = 1; i < argc; i++) {
@@ -740,6 +743,7 @@ int main(int argc, char *argv[])
 			do_emu_action();
 	}
 
+	ab_session_exit();
 	printf("Exit..\n");
 	ClosePlugins();
 	SysClose();
