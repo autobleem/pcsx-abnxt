@@ -454,6 +454,9 @@ static const struct {
 	CE_INTVAL_N("adev1_axis1", in_adev_axis[1][1]),
 	CE_INTVAL_N("adev0_is_nublike", in_adev_is_nublike[0]),
 	CE_INTVAL_N("adev1_is_nublike", in_adev_is_nublike[1]),
+	// AutoBleem's game editor writes pcsx-ab's "frameskip3" (the same 0 auto / 1 off / 2-4 values; upstream
+	// bumped the name with its default): read as an alias, written back too so the editor sees the value
+	CE_INTVAL_N("frameskip3", frameskip),
 	CE_INTVAL_V(frameskip, 4),
 	CE_INTVAL_PV(dithering, 2),
 	CE_INTVAL_P(thread_rendering),
