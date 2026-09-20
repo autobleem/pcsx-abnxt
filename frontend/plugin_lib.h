@@ -20,6 +20,9 @@ enum {
 	DKEY_SQUARE,
 };
 extern int in_type[8];
+// the picture as the emulator drew it (before any 2x enhancement or scaling) - its line count is what
+// a platform that draws the scanlines itself needs; pl_scanlines_by_plat says one does
+extern int pl_vout_raw_h, pl_scanlines_by_plat;
 extern int multitap1;
 extern int multitap2;
 extern int in_analog_left[8][2];
