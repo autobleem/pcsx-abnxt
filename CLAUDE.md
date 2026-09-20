@@ -10,10 +10,11 @@ change (commit messages are prose).
 
 ## State (2026-09-20)
 
-Phases 0-4 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the SDL2
-platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave ring
-and the power daemon, and a first disc change (phase 5's core without its picker screen). All of it
-verified on Windows only; the first runs on the Pi 400 and the console are the next thing.
+Phases 0-4 and 6 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the
+SDL2 platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave
+ring and the power daemon, the in-game menu, and phase 5's disc change without its picker screen. All of it
+verified on Windows only; the first runs on the Pi 400 and the console are the next thing, then phase 5's
+picker and phase 7 (the compatibility pass).
 
 | | |
 |---|---|
@@ -54,14 +55,19 @@ takes it); the menu's Exit and the window's close leave the live state. `AB_NO_A
 `ab_console`: the power daemon's `prepare_suspend` and `cpu_temp`/`temp_limit` watchers (inotify threads,
 Linux only, ending at once without the files). `ab_disc`: the disc set (multi-disc PBP, an `.m3u`, or the
 folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
-start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring.
+start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring. `ab_menu.c`:
+the in-game menu (Resume, Quick save/load = slot 2, Change disc, Toggle filter, PCSX menu = upstream's
+whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as `autobleem.cfg`, Exit), `#include`d into
+`frontend/menu.c` like libpicofe's menu.c because the menu machinery is static there. Player 2's sticks:
+`in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
 
 Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`
 for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
 default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
 default, our four `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
-names), `frontend/plugin_lib.c` (`ab_frame_tick()`), `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync
-in `SaveMcd`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
+names), `frontend/plugin_lib.c` (`ab_frame_tick()`; the analog tables at 4 and `update_analogs()` over both
+players), `frontend/plugin_lib.h` (the same tables), `frontend/menu.c` also `#include`s `ab/ab_menu.c` and
+runs `ab_menu_loop_d()`, `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync in `SaveMcd`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
 else Windows-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
 `win32_compat.h` force-included by CMake) and `NO_DYLIB` (upstream's own Windows recipe).
 
