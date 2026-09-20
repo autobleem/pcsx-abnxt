@@ -3,6 +3,13 @@
  * e_menu_main3, "Enhanced Edition by AutoBleem Team"). Quick save/load, the disc, the filter, the whole
  * upstream menu one level down, the AutoBleem config, Exit.
  *
+ * The entries are libpicofe menu_entry rows (the handlers, enums and ranges work as in every other menu)
+ * but the screen is ours: AutoBleem 2's launcher art as the background (skin/ab_background.jpg), the game
+ * and the build named in the launcher's font (ab_ui), the rows on a panel on the right. Nothing of the
+ * paused game is shown - the frame libpicofe pasted behind its menu was garbage on the console whenever
+ * the GPU rendered at another size than it reported. Upstream's own menus, one level down, keep their
+ * look over a darkened copy of the same art.
+ *
  * Not a translation unit of its own: frontend/menu.c #includes it after its own menus, the way it includes
  * libpicofe/menu.c, because everything a menu is built from (me_loop_d, mee_*, main_menu_handler,
  * menu_loop_savestate, menu_write_config...) is static in that unit.
@@ -33,6 +40,7 @@ enum {
 static int ab_menu_handler(int id, int keys);
 static int ab_menu_pcsx_handler(int id, int keys);
 static int ab_disc_screen(void);
+static const char *ab_filter_name(int id, int *offs);
 
 static const char h_ab_filter[] = "Off = plain pixels, Linear = smoothed, Sharp = crisp pixels without shimmer";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
@@ -49,13 +57,11 @@ static const char h_ab_pad[]     = "Standard (digital), analog (DualShock), a gu
 
 static menu_entry e_menu_ab[] =
 {
-	mee_label     (""),
-	mee_label     (""),
 	mee_handler_id("Resume game",              MA_MAIN_RESUME_GAME, main_menu_handler),
 	mee_handler_id("Quick save",               MA_AB_QUICKSAVE,     ab_menu_handler),
 	mee_handler_id("Quick load",               MA_AB_QUICKLOAD,     ab_menu_handler),
 	mee_handler_id("Change disc",              MA_AB_DISC,          ab_menu_handler),
-	mee_handler_id_h("Filter",                 MA_AB_FILTER,        ab_menu_handler, h_ab_filter),
+	mee_cust_h    ("Filter",                   MA_AB_FILTER,        ab_menu_handler, ab_filter_name, h_ab_filter),
 	mee_enum_h    ("Screen",                   0,                   ab_aspect_sel, men_ab_aspect, h_ab_aspect),
 	mee_enum_h    ("Scanlines",                MA_OPT_SCANLINES,    scanlines, men_scanlines, h_ab_scanlines),
 	mee_range_h   ("Scanline brightness",      MA_OPT_SCANLINE_LEVEL, scanline_level, 0, 100, h_scanline_l),
@@ -133,13 +139,20 @@ static int ab_menu_handler(int id, int keys)
 			return 1;
 		break;
 	case MA_AB_FILTER:
+		/* a value row: Left goes back through the list, Right and Cross forward */
 		if (plat_target.hwfilters == NULL)
 			break;
-		plat_target.hwfilter++;
-		if (plat_target.hwfilters[plat_target.hwfilter] == NULL)
-			plat_target.hwfilter = 0;
-		snprintf(msg, sizeof(msg), "Filter: %s", plat_target.hwfilters[plat_target.hwfilter]);
-		menu_update_msg(msg);
+		if (keys & PBTN_LEFT) {
+			if (plat_target.hwfilter > 0)
+				plat_target.hwfilter--;
+			else
+				while (plat_target.hwfilters[plat_target.hwfilter + 1] != NULL)
+					plat_target.hwfilter++;
+		} else {
+			plat_target.hwfilter++;
+			if (plat_target.hwfilters[plat_target.hwfilter] == NULL)
+				plat_target.hwfilter = 0;
+		}
 		break;
 	case MA_AB_SAVECFG:
 		menu_update_msg(ab_save_config() == 0 ? "AutoBleem config saved" : "Failed to save the config");
@@ -150,8 +163,12 @@ static int ab_menu_handler(int id, int keys)
 	return 0;
 }
 
-/* upstream's main menu, one level down; 1 when it asked to go back to the game or to exit */
-/* ---- the disc picker (docs/port-plan.md, phase 5) ----
+static const char *ab_filter_name(int id, int *offs)
+{
+	return plat_target.hwfilters != NULL ? plat_target.hwfilters[plat_target.hwfilter] : "-";
+}
+
+/* ---- the disc picker ----
  *
  * Drawn on the menu's canvas over the darkened last frame, the way the menus are, at a 1280x720 design
  * scaled to the canvas: the title, the set's discs in a row (the one in the drive in AutoBleem's cyan,

@@ -10,12 +10,23 @@ change (commit messages are prose).
 
 ## State (2026-09-20)
 
-Phases 0-6 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the
-SDL2 platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave
-ring and the power daemon, the disc change with its picker (below), the in-game menu. All of it
-verified on Windows first; **running on the Pi 400 since 2026-09-20** (64-bit, `Autobleem/bin/emunxt/`,
-the launcher's Options -> "PS1 Emulator") - Crash Bandicoot and Harvest Moon with the real BIOS, the
-menu, scanlines, the pad. The console is still unrun. Next: phase 7 (the compatibility pass).
+**The port plan is complete** (the owner's call, 2026-09-20 night; the plan itself, `docs/port-plan.md`,
+is deleted as finished plans are - `git show 82d77a16:docs/port-plan.md` has it): the repositories, the CMake
+build for every target (psc, rpi, rpi64, pcusb, win64), the SDL2 platform, the launcher's contract
+(arguments, config, exit files), the front buttons with the autosave ring and the power daemon, the disc
+change with its picker (below), the in-game menu with every launcher option. All of it verified on Windows
+first; **running on the Pi 400 since 2026-09-20** (64-bit, `Autobleem/bin/emunxt/`, the launcher's
+Options -> "PS1 Emulator") - Crash Bandicoot and Harvest Moon with the real BIOS, the menu, scanlines, the
+pad. **What is deferred, not done - the owner tests everything later**: the plan's phase 7, the
+compatibility pass (the 20 built-in games and the `title.h` titles on the console, a subset on the Pi:
+boot, the first minutes, a save, FMV, CDDA, a real disc swap - Parasite Eve / RE2 / FF7; a regression that
+reproduces gets a `database.c` entry or an upstream issue; the pass list goes here; also the pcsx-ab test
+material on `D:\AB\Games` - CHDs with CDDA, the 30-track cue, PBPs), which is what decides which of
+Sony's 131 per-title hacks are needed; **the console has never run pcsx-abnxt** (drop the psc tarball
+over `Autobleem/bin/emunxt/`); and phase 8, the release - nxt as *the* emulator in `emu/`, `pcsx-ab2`
+archived on GitHub - which only makes sense after that pass. Out of scope by decision: the libretro core
+build, Sony's `UI_INTEGRATION`/`.sts`/the Pandora-Maemo-Caanoo platforms, GPU/SPU features beyond
+upstream's; a "which disc" picker in the launcher's resume menu and the `.m3u` hand-over are follow-ups.
 
 **The disc picker and the emulator's own language** (2026-09-20, phase 5 complete): the Open button and
 the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the paused game - the set's discs in
@@ -138,8 +149,8 @@ cannot test the resume path.
 
 ## What this is built from - read first
 
-- **`docs/port-plan.md`** - the plan: the analysis, the decisions, the eight phases. Delete it when every step
-  is done and move what still matters here.
+- The port plan (the analysis, the decisions, the eight phases) is in the git history: `git show
+  82d77a16:docs/port-plan.md`. The decisions it made are recorded in this file.
 - **`docs/reference/features.md`** - every feature Sony and AutoBleem added to pcsx-ab, with line pointers
   into **`docs/reference/pcsx-ab-delta-2017.patch`** (pcsx-ab against its real upstream base, `bebe989b` of
   2017-10-17, whitespace-normalised) and **`libpicofe-delta-2015.patch`** (its libpicofe against `21604a0`).

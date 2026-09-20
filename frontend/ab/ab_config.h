@@ -1,6 +1,6 @@
 /*
  * AutoBleem's command line and configuration on top of pcsx-rearmed's: what rc/launch.sh passes and what
- * the launcher writes into pcsx.cfg (see docs/port-plan.md, "The contract with AutoBleem").
+ * the launcher writes into pcsx.cfg (the contract with AutoBleem - CLAUDE.md).
  *
  *   pcsx-ab -filter F -ratio R -lang L -region N -enter E [-display D] [-load 1] [-language Name] -cdfile <image>
  *

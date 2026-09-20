@@ -3,7 +3,7 @@
 # sdl12-compat,SDL2} packages), the same way AutoBleem's make_win.sh works. The PC build runs games for real:
 # the lightrec dynarec and the C-SIMD NEON GPU (upstream's own x86 configuration).
 #
-# Until the SDL2 platform exists (docs/port-plan.md, phase 2) the frontend is upstream's SDL 1.2 one, built
+# Until the SDL2 platform exists (phase 2 of the port) the frontend is upstream's SDL 1.2 one, built
 # over sdl12-compat: its YUV-overlay video path stays black there, so run with a .pcsx/pcsx.cfg that says
 # "plat_target.vout_method = 0" (the plain surface path draws).
 #
