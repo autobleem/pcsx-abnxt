@@ -216,7 +216,8 @@ set(PCSXAB_SOURCES
     frontend/cspace.c frontend/plugin_lib.c frontend/plugin.c frontend/main.c frontend/menu.c
     frontend/libpicofe/input.c frontend/libpicofe/readpng.c frontend/libpicofe/fonts.c
     # AutoBleem's own (docs/port-plan.md: new files, hooks only in upstream's)
-    frontend/ab/ab_config.c frontend/ab/ab_session.c
+    frontend/ab/ab_config.c frontend/ab/ab_session.c frontend/ab/ab_buttons.c frontend/ab/ab_autosave.c
+    frontend/ab/ab_console.c frontend/ab/ab_disc.c
 )
 set_source_files_properties(frontend/libpicofe/input.c PROPERTIES COMPILE_OPTIONS -Wno-array-bounds)
 set_source_files_properties(libpcsxcore/psxbios.c PROPERTIES COMPILE_OPTIONS -Wno-nonnull)

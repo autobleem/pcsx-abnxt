@@ -17,14 +17,19 @@
 #include "../plugin_lib.h"
 #include "../main.h"
 #include "ab_session.h"
+#include "ab_autosave.h"
 
-static int exit_saved;
+static char game_name[64];
+static int exit_saved, from_ring;
 
-void ab_session_game_name(char *buf, int size)
+const char *ab_session_game_name(void)
 {
 	char trimlabel[33];
 	int j;
 
+	game_name[0] = 0;
+	if (CdromId[0] == 0)
+		return game_name;
 	/* as main.c's get_gameid_filename(): the label without its trailing spaces, then the id */
 	strncpy(trimlabel, CdromLabel, 32);
 	trimlabel[32] = 0;
@@ -33,7 +38,13 @@ void ab_session_game_name(char *buf, int size)
 			trimlabel[j] = 0;
 		else
 			break;
-	snprintf(buf, size, "%.32s-%.9s", trimlabel, CdromId);
+	snprintf(game_name, sizeof(game_name), "%.32s-%.9s", trimlabel, CdromId);
+	return game_name;
+}
+
+void ab_session_exit_from_ring(void)
+{
+	from_ring = 1;
 }
 
 static int write_lines(const char *fname, const char *line1, const char *line2)
@@ -52,9 +63,8 @@ static int write_lines(const char *fname, const char *line1, const char *line2)
 	return 0;
 }
 
-static int save_picture(const char *name)
+static int save_live_picture(const char *picture_path)
 {
-	char path[MAXPATHLEN + 64], fname[MAXPATHLEN];
 	void *scrbuf;
 	int w, h, bpp, ret;
 
@@ -63,30 +73,43 @@ static int save_picture(const char *name)
 		SysPrintf("autobleem: no picture for the resume point (bpp %d)\n", bpp);
 		return -1;
 	}
-	snprintf(fname, sizeof(fname), "%s.png", name);
-	emu_make_path(path, sizeof(path), SCREENSHOTS_DIR, fname);
-	ret = writepng(path, scrbuf, w, h);
+	ret = writepng(picture_path, scrbuf, w, h);
 	if (ret != 0)
-		SysPrintf("autobleem: writepng %s: %d\n", path, ret);
+		SysPrintf("autobleem: writepng %s: %d\n", picture_path, ret);
 	return ret;
 }
 
 int ab_session_save_exit(void)
 {
-	char name[64], path[MAXPATHLEN + 64];
+	char state_path[MAXPATHLEN + 64], picture_path[MAXPATHLEN + 64], path[MAXPATHLEN + 64], fname[80];
 	const char *iso = GetIsoFile();
+	const char *name = ab_session_game_name();
 	int ret = 0;
 
-	if (CdromId[0] == 0 || iso == NULL || iso[0] == 0) {
+	if (name[0] == 0 || iso == NULL || iso[0] == 0) {
 		SysPrintf("autobleem: no disc loaded, nothing to leave behind\n");
 		return -1;
 	}
-	ab_session_game_name(name, sizeof(name));
 
-	if (emu_save_state(0) != 0)
-		ret = -1;
-	if (save_picture(name) != 0)
-		ret = -1;
+	/* the state goes where get_state_filename() puts slot 0, by the disc in the drive: the launcher
+	 * records the name (filename.txt) with the disc (lastcdimg.txt) and starts the next run on that
+	 * disc, so the two agree again */
+	snprintf(fname, sizeof(fname), "%s.000", name);
+	emu_make_path(state_path, sizeof(state_path), STATES_DIR, fname);
+	snprintf(fname, sizeof(fname), "%s.png", name);
+	emu_make_path(picture_path, sizeof(picture_path), SCREENSHOTS_DIR, fname);
+
+	if (from_ring && ab_autosave_available()) {
+		if (ab_autosave_write_oldest(state_path, picture_path) != 0)
+			ret = -1;
+	} else {
+		if (SaveState(state_path) != 0) {
+			SysPrintf("autobleem: failed to save %s\n", state_path);
+			ret = -1;
+		}
+		if (save_live_picture(picture_path) != 0)
+			ret = -1;
+	}
 
 	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "lastcdimg.txt");
 	if (write_lines(path, iso, NULL) != 0)
@@ -96,7 +119,8 @@ int ab_session_save_exit(void)
 	if (write_lines(path, iso, name) != 0)
 		ret = -1;
 
-	SysPrintf("autobleem: resume point %s %s\n", name, ret == 0 ? "saved" : "incomplete");
+	SysPrintf("autobleem: resume point %s (%s) %s\n", name, from_ring ? "from the ring" : "live",
+		ret == 0 ? "saved" : "incomplete");
 	return ret;
 }
 

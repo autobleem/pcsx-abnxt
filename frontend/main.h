@@ -93,6 +93,11 @@ enum sched_action {
 	SACTION_GUN_B,
 	SACTION_GUN_TRIGGER2,
 	SACTION_ANALOG_TOGGLE,
+	/* AutoBleem (frontend/ab/ab_buttons.c): the PlayStation Classic's front buttons */
+	SACTION_AB_CD_CHANGE = 21,
+	SACTION_AB_RESET,
+	SACTION_AB_POWER_OFF,
+	SACTION_AB_SNAPSHOT,	/* the autosave ring's next snapshot */
 };
 
 #define SACTION_GUN_MASK (0x0f << SACTION_GUN_TRIGGER)

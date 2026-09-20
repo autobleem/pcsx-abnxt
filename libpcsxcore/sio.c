@@ -27,6 +27,8 @@
 #include "psxevents.h"
 #include "sio.h"
 #include <sys/stat.h>
+#include <unistd.h>
+#include "../frontend/ab/ab_autosave.h"
 
 #ifdef USE_LIBRETRO_VFS
 #include <streams/file_stream_transforms.h>
@@ -417,6 +419,7 @@ void SaveMcd(char *mcd, char *data, uint32_t adr, int size) {
 
 	if (mcd == NULL || *mcd == 0 || strcmp(mcd, "none") == 0)
 		return;
+	ab_memcard_written();
 
 	f = fopen(mcd, "r+b");
 	if (f != NULL) {
@@ -433,6 +436,8 @@ void SaveMcd(char *mcd, char *data, uint32_t adr, int size) {
 			fseek(f, adr, SEEK_SET);
 
 		fwrite(data + adr, 1, size, f);
+		fflush(f);
+		fsync(fileno(f));	// a power cut is a normal way to stop a console
 		fclose(f);
 		return;
 	}
