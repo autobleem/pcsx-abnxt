@@ -318,11 +318,12 @@ static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
 			hud_msg[0] = 0;
 		}
 	}
-	else if (scanlines != 0 && scanline_level != 100 && bpp == 16) {
+	else
+#endif
+	if (scanlines != 0 && scanline_level != 100 && bpp == 16) {
 		if (h <= 256)
 			pl_vout_scale_h = 2;
 	}
-#endif
 	vout_w *= pl_vout_scale_w;
 	vout_h *= pl_vout_scale_h;
 
@@ -460,7 +461,8 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 		neon_eagle2x_16_16((const void *)(vram + vram_ofs), (void *)dest, w,
 			2048, dstride * 2, h);
 	}
-	else if (scanlines != 0 && scanline_level != 100)
+#endif
+	else if (scanlines != 0 && scanline_level != 100 && !enhres && psx_bpp == 16)
 	{
 		int h2, l = scanline_level * 2048 / 100;
 		int stride_0 = pl_vout_scale_h >= 2 ? 0 : sstride;
@@ -481,7 +483,6 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 			}
 		}
 	}
-#endif
 	else
 	{
 		unsigned int vram_mask = enhres ? ~0 : 0xfffff;

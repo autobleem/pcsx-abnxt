@@ -34,6 +34,15 @@ static int ab_menu_pcsx_handler(int id, int keys);
 static const char h_ab_filter[] = "Bilinear or nearest scaling of the picture";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
 static const char h_ab_savecfg[] = "Keeps today's settings for this game in AutoBleem";
+static const char h_ab_scanlines[] = "Dark lines between the picture's rows, 1-3 rows thick;"
+                                     " brightness is how dark";
+/* the picture's shape as the launcher's "Widescreen" option sets it (-ratio): 4:3 in the middle of the
+ * screen, or the whole 16:9 screen; the PCSX menu's "Scaler" is the full set, this is the switch */
+static int ab_aspect_sel;
+static const char *men_ab_aspect[] = { "4:3", "16:9 (fullscreen)", NULL };
+static const char h_ab_aspect[]  = "4:3 as the PlayStation drew it, or stretched over the whole screen";
+static const char h_ab_pad[]     = "Standard (digital), analog (DualShock), a gun or nothing;"
+                                   " takes effect when the game goes on";
 
 static menu_entry e_menu_ab[] =
 {
@@ -44,6 +53,11 @@ static menu_entry e_menu_ab[] =
 	mee_handler_id("Quick load",               MA_AB_QUICKLOAD,     ab_menu_handler),
 	mee_handler_id("Change disc",              MA_AB_DISC,          ab_menu_handler),
 	mee_handler_id_h("Toggle filter",          MA_AB_FILTER,        ab_menu_handler, h_ab_filter),
+	mee_enum_h    ("Screen",                   0,                   ab_aspect_sel, men_ab_aspect, h_ab_aspect),
+	mee_enum_h    ("Scanlines",                MA_OPT_SCANLINES,    scanlines, men_scanlines, h_ab_scanlines),
+	mee_range_h   ("Scanline brightness",      MA_OPT_SCANLINE_LEVEL, scanline_level, 0, 100, h_scanline_l),
+	mee_enum_h    ("Controller 1",             0,                   in_type_sel1, men_in_type_sel, h_ab_pad),
+	mee_enum_h    ("Controller 2",             0,                   in_type_sel2, men_in_type_sel, h_ab_pad),
 	mee_handler_id_h("PCSX menu",              MA_AB_PCSX_MENU,     ab_menu_pcsx_handler, h_ab_pcsx),
 	mee_handler_id_h("Save AutoBleem config",  MA_AB_SAVECFG,       ab_menu_handler, h_ab_savecfg),
 	mee_handler_id("Exit",                     MA_MAIN_EXIT,        main_menu_handler),
@@ -160,6 +174,11 @@ static void ab_menu_loop_d(void)
 	me_enable(e_menu_ab, MA_AB_FILTER,    plat_target.hwfilters != NULL);
 
 	do {
+		ab_aspect_sel = g_scaler == SCALE_FULLSCREEN;
 		me_loop_d(e_menu_ab, &sel, NULL, draw_frame_main);
+		/* the row is a two-way switch over g_scaler; a scaler the row cannot name (custom, 1x1) is left
+		 * alone unless the row was moved */
+		if (ab_aspect_sel != (g_scaler == SCALE_FULLSCREEN))
+			g_scaler = ab_aspect_sel ? SCALE_FULLSCREEN : SCALE_4_3;
 	} while (!ready_to_go && !g_emu_want_quit);
 }
