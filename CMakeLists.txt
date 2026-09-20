@@ -155,13 +155,18 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # include/revision.h: the Makefile regenerates it from `git describe` on every build; here at configure
-# time into the build tree (re-run cmake to pick up a new tag). A tree without git history gets REV "".
+# time into the build tree (re-run cmake to pick up a new tag). A tree without git history (the build
+# server's rsync copy) takes AB_GIT_DESCRIBE from the environment - what the caller's `git describe` said,
+# passed into the Docker image like AutoBleem's AB_GIT_* - and REV "" without that.
 find_package(Git QUIET)
 set(_pcsxab_rev "")
 if (GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
     execute_process(COMMAND ${GIT_EXECUTABLE} describe --always --dirty
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT_VARIABLE _pcsxab_rev OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+endif()
+if (_pcsxab_rev STREQUAL "" AND DEFINED ENV{AB_GIT_DESCRIBE})
+    set(_pcsxab_rev "$ENV{AB_GIT_DESCRIBE}")
 endif()
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/revision.h.in" "#define REV \"${_pcsxab_rev}\"\n")
 configure_file("${CMAKE_CURRENT_BINARY_DIR}/revision.h.in" "${CMAKE_CURRENT_BINARY_DIR}/generated/include/revision.h" COPYONLY)
