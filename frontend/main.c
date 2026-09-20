@@ -134,6 +134,10 @@ void emu_set_default_config(void)
 	Config.GpuListWalking = -1;
 	Config.FractionalFramerate = -1;
 	Config.AlternativeFlip = -1;
+	// AutoBleem: the BIOS shell and its logos run unless the game's pcsx.cfg says "SlowBoot = 0" - the
+	// console's emulator always did, and the launcher's "Boot logo" option writes no line for "shown"
+	// (upstream's default is 0, straight into the game)
+	Config.SlowBoot = 1;
 
 	pl_rearmed_cbs.dithering = 1;
 	pl_rearmed_cbs.gpu_neon.allow_interlace = 2; // auto

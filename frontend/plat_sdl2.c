@@ -239,6 +239,12 @@ void plat_finish(void)
 /* the menu's "Fullscreen mode" and the F11 action both just flip plat_target.vout_fullscreen */
 static void check_fullscreen(void)
 {
+#if defined(__arm__) || defined(__aarch64__)
+  /* the console and the Pi have no desktop to leave fullscreen for: a "plat_target.vout_fullscreen = 0"
+   * in a game's pcsx.cfg (every pcsx-ab-era cfg has one) used to drop the window to 1280x720 and bring
+   * the mouse pointer back */
+  plat_target.vout_fullscreen = 1;
+#endif
   if (plat_target.vout_fullscreen != fullscreen_old) {
     plat_sdl2_set_fullscreen(plat_target.vout_fullscreen);
     plat_target.vout_fullscreen = fullscreen_old = plat_sdl2_is_fullscreen();
