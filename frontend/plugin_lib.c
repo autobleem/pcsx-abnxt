@@ -46,14 +46,14 @@ int multitap1;
 int multitap2;
 int in_analog_left[8][2] = {{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 }};
 int in_analog_right[8][2] = {{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 },{ 127, 127 }};
-int in_adev[2] = { -1, -1 };
-int in_adev_axis[2][2] =
+int in_adev[4] = { -1, -1, -1, -1 };
+int in_adev_axis[4][2] =
 #ifdef PANDORA
-  {{ 0, 1 }, { 0, 1 }};
+  {{ 0, 1 }, { 0, 1 }, { 0, 1 }, { 2, 3 }};
 #else
-  {{ 0, 1 }, { 2, 3 }};
+  {{ 0, 1 }, { 2, 3 }, { 0, 1 }, { 2, 3 }};
 #endif
-int in_adev_is_nublike[2];
+int in_adev_is_nublike[4];
 unsigned short in_keystate[8];
 int in_mouse[8][2];
 int in_enable_vibration;
@@ -657,11 +657,11 @@ static void update_analog_nub_adjust(int *x_, int *y_)
 
 static void update_analogs(void)
 {
-	int *nubp[2] = { in_analog_left[0], in_analog_right[0] };
+	int *nubp[4] = { in_analog_left[0], in_analog_right[0], in_analog_left[1], in_analog_right[1] };
 	int vals[2];
 	int i, a, v, ret;
 
-	for (i = 0; i < 2; i++)
+	for (i = 0; i < 4; i++)
 	{
 		if (in_adev[i] < 0)
 			continue;
@@ -706,7 +706,8 @@ static void update_input(void)
 	int i;
 
 	in_update(actions);
-	if (in_type[0] == PSE_PAD_TYPE_ANALOGJOY || in_type[0] == PSE_PAD_TYPE_ANALOGPAD)
+	if (in_type[0] == PSE_PAD_TYPE_ANALOGJOY || in_type[0] == PSE_PAD_TYPE_ANALOGPAD
+	    || in_type[1] == PSE_PAD_TYPE_ANALOGJOY || in_type[1] == PSE_PAD_TYPE_ANALOGPAD)
 		update_analogs();
 	emu_act = actions[IN_BINDTYPE_EMU];
 	in_state_gun = emu_act & SACTION_GUN_MASK;

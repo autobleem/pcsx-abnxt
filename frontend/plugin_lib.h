@@ -27,8 +27,9 @@ extern int in_analog_right[8][2];
 extern unsigned short in_keystate[8];
 extern int in_mouse[8][2];
 
-extern int in_adev[2], in_adev_axis[2][2];
-extern int in_adev_is_nublike[2];
+/* the analog sticks by player: [0]/[1] player 1's left/right, [2]/[3] player 2's */
+extern int in_adev[4], in_adev_axis[4][2];
+extern int in_adev_is_nublike[4];
 extern int in_enable_vibration;
 
 extern void *pl_vout_buf;

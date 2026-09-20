@@ -152,14 +152,17 @@ static void resize_cb(int w, int h)
     g_menuscreen_ptr = menu_fb;
 }
 
-/* every pad is a player's analog sticks too: player 1's on in_adev[0] (left) / [1] (right) */
+/* every pad is its player's analog sticks too: in_adev[0]/[1] player 1's left/right, [2]/[3] player 2's */
 static void pads_changed(int pad_count)
 {
-  int dev = in_sdl2gc_dev_id(1);
-  in_adev[0] = in_adev[1] = dev;
-  in_adev_axis[0][0] = SDL2GC_AXIS_LX; in_adev_axis[0][1] = SDL2GC_AXIS_LY;
-  in_adev_axis[1][0] = SDL2GC_AXIS_RX; in_adev_axis[1][1] = SDL2GC_AXIS_RY;
-  in_adev_is_nublike[0] = in_adev_is_nublike[1] = 0;
+  int p;
+  for (p = 0; p < 2; p++) {
+    int dev = in_sdl2gc_dev_id(p + 1);
+    in_adev[p * 2] = in_adev[p * 2 + 1] = dev;
+    in_adev_axis[p * 2][0] = SDL2GC_AXIS_LX; in_adev_axis[p * 2][1] = SDL2GC_AXIS_LY;
+    in_adev_axis[p * 2 + 1][0] = SDL2GC_AXIS_RX; in_adev_axis[p * 2 + 1][1] = SDL2GC_AXIS_RY;
+    in_adev_is_nublike[p * 2] = in_adev_is_nublike[p * 2 + 1] = 0;
+  }
   printf("plat_sdl2: %d pad(s)\n", pad_count);
 }
 
