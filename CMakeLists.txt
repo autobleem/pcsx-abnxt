@@ -161,9 +161,17 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 find_package(Git QUIET)
 set(_pcsxab_rev "")
 if (GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
-    execute_process(COMMAND ${GIT_EXECUTABLE} describe --always --dirty
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --always
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         OUTPUT_VARIABLE _pcsxab_rev OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    # -dirty by our own files only: the submodules are upstream's and never edited here, and on Windows
+    # MSYS2's git and Git for Windows disagree about their line endings, which made every build "dirty"
+    execute_process(COMMAND ${GIT_EXECUTABLE} diff-index --quiet --ignore-submodules=all HEAD --
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        RESULT_VARIABLE _pcsxab_dirty ERROR_QUIET)
+    if (NOT _pcsxab_rev STREQUAL "" AND NOT _pcsxab_dirty EQUAL 0)
+        set(_pcsxab_rev "${_pcsxab_rev}-dirty")
+    endif()
 endif()
 if (_pcsxab_rev STREQUAL "" AND DEFINED ENV{AB_GIT_DESCRIBE})
     set(_pcsxab_rev "$ENV{AB_GIT_DESCRIBE}")
