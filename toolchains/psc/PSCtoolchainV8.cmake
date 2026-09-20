@@ -49,5 +49,6 @@ set(CMAKE_ASM_FLAGS_INIT "${_pcsxab_psc_arch}")
 # our FindSDL2: the sysroot's SDL2 2.0.4 predates sdl2-config.cmake
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
-# The console runs Weston: GL output goes EGL-on-Wayland through SDL2's window (frontend/libpicofe/gl_platform.c).
-set(PCSXAB_GLES ON CACHE BOOL "" FORCE)
+# The console runs Weston; the SDL2 platform (frontend/plat_sdl2.c) draws through SDL2's renderer on its
+# Wayland window (GLES2 underneath), so libpicofe's own EGL output stays off, as on the Pi.
+set(PCSXAB_GLES OFF CACHE BOOL "" FORCE)

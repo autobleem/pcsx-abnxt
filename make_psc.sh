@@ -38,7 +38,6 @@ fi
 echo "==> configuring and building on $HOST"
 $SSH "cd $REMOTE_DIR && $REMOTE_CMAKE -S . -B build_psc -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_TOOLCHAIN_FILE=toolchains/psc/PSCtoolchainV8.cmake -DPCSXAB_PSC_TOOLCHAIN=$TOOLCHAIN \
-        -DPCSXAB_PLATFORM=headless -DPCSXAB_SOUND_DRIVERS= \
     && $REMOTE_CMAKE --build build_psc -j $JOBS"
 
 echo "==> fetching results (stripped, as build_pcsx.sh did; the unstripped ones stay on the server for gdb)"
