@@ -2,7 +2,7 @@
  * AutoBleem's command line and configuration on top of pcsx-rearmed's: what rc/launch.sh passes and what
  * the launcher writes into pcsx.cfg (see docs/port-plan.md, "The contract with AutoBleem").
  *
- *   pcsx-ab -filter F -ratio R -lang L -region N -enter E [-display D] [-load 1] -cdfile <image>
+ *   pcsx-ab -filter F -ratio R -lang L -region N -enter E [-display D] [-load 1] [-language Name] -cdfile <image>
  *
  * (C) AutoBleem team, 2026
  *
@@ -19,6 +19,10 @@ struct ab_options {
 	int region;	/* -region: accepted for the launch script's sake, the disc decides */
 	int enter;	/* -enter: accepted, always 1 from the launcher */
 	int display;	/* -display: accepted, unused */
+	/* -language: the launcher's language by the name of its lang file (English, Polski, Chinese_Simplified...),
+	 * what lang/<Name>.txt next to the emulator translates the emulator's own screens with (ab_ui.h);
+	 * only pcsx-abnxt gets it - the launch scripts keep it from the classic pcsx-ab */
+	char language[64];
 };
 extern struct ab_options ab_opts;
 

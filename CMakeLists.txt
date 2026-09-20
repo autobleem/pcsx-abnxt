@@ -217,9 +217,11 @@ set(PCSXAB_SOURCES
     frontend/libpicofe/input.c frontend/libpicofe/readpng.c frontend/libpicofe/fonts.c
     # AutoBleem's own (docs/port-plan.md: new files, hooks only in upstream's)
     frontend/ab/ab_config.c frontend/ab/ab_session.c frontend/ab/ab_buttons.c frontend/ab/ab_autosave.c
-    frontend/ab/ab_console.c frontend/ab/ab_disc.c
+    frontend/ab/ab_console.c frontend/ab/ab_disc.c frontend/ab/ab_ui.c
 )
 set_source_files_properties(frontend/libpicofe/input.c PROPERTIES COMPILE_OPTIONS -Wno-array-bounds)
+# stb_truetype (STBTT_STATIC) defines its whole API; we use a corner of it
+set_source_files_properties(frontend/ab/ab_ui.c PROPERTIES COMPILE_OPTIONS -Wno-unused-function)
 set_source_files_properties(libpcsxcore/psxbios.c PROPERTIES COMPILE_OPTIONS -Wno-nonnull)
 set_source_files_properties(libpcsxcore/cdriso.c PROPERTIES COMPILE_OPTIONS -Wno-unused-function)
 set_source_files_properties(frontend/menu.c PROPERTIES COMPILE_DEFINITIONS "SDL_OVERLAY_2X;MENU_SHOW_VARSCALER=1")

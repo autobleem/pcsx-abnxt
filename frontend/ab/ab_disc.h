@@ -4,9 +4,12 @@
  * change from one to the next through the core's CD lid (SetCdOpenCaseTime/LidInterrupt, as upstream's
  * menu swaps discs).
  *
- * The Open button is refused for AB_OPEN_GRACE_S after the run starts (Sony's open_invalid_time: a
- * game does not survive a lid opened while it boots), and says so on the HUD. Today one press moves to
- * the next disc and says which one; the disc picker screen is phase 5's.
+ * The Open button (and the menu's "Change disc") opens the disc picker over the paused game
+ * (ab_menu_change_disc, in ab_menu.c): the set's discs in a row, the one in the drive marked, the next
+ * one focused, Left/Right and Cross put a disc in through the lid, Circle backs out. A single-disc game
+ * gets a message instead, and so does a press in the first AB_OPEN_GRACE_S seconds of the run (Sony's
+ * open_invalid_time: a game does not survive a lid opened while it boots). The screens' text is in the
+ * launcher's language (ab_ui.h).
  *
  * (C) AutoBleem team, 2026
  *
@@ -19,8 +22,14 @@
 #define AB_OPEN_GRACE_S 22
 #define AB_DISC_MAX 8
 
-/* the Open button: the next disc of the set, or a message */
+/* the Open button: the picker over the paused game */
 void ab_disc_change(void);
+/* a change is allowed now (past the first AB_OPEN_GRACE_S seconds of the run) */
+int ab_disc_can_change(void);
+/* puts disc `index` (0-based) in the drive through the lid, with a HUD line; 0 = done */
+int ab_disc_insert(int index);
+/* the picker screen, ab_menu.c (menu.c's unit): leaves the emulator, shows it, comes back */
+void ab_menu_change_disc(void);
 /* once per frame: learns the set when the disc id becomes known */
 void ab_disc_tick(void);
 /* how many discs the set has (1 = no change possible), and which is in the drive (0-based) */

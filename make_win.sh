@@ -21,6 +21,8 @@ for dll in $(ldd build_win/pcsx-ab.exe | awk '/ucrt64/ {print $3}') /ucrt64/bin/
     cp -u "$dll" build_win/
 done
 # the menu's skin, looked up next to the executable
-mkdir -p build_win/skin
-cp -u frontend/pandora/skin/* build_win/skin/
+mkdir -p build_win/skin build_win/lang
+cp -u frontend/pandora/skin/* frontend/ab/skin/* build_win/skin/
+# the emulator's own screens in the launcher's languages (frontend/ab/ab_ui.h)
+cp -u frontend/ab/lang/*.txt build_win/lang/
 echo "==> build_win/pcsx-ab.exe"

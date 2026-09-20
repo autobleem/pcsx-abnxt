@@ -43,6 +43,10 @@ dist() { # dist BUILD_DIR STRIP - the stripped emulator and plugins
     mkdir -p "$dir/dist/plugins"
     "$strip" -o "$dir/dist/pcsx-ab" "$dir/pcsx-ab"
     for so in "$dir"/plugins/*.so; do "$strip" -o "$dir/dist/plugins/$(basename "$so")" "$so"; done
+    # the emulator's own screens: their font and the launcher's languages (frontend/ab/ab_ui.h)
+    mkdir -p "$dir/dist/skin" "$dir/dist/lang"
+    cp frontend/ab/skin/* "$dir/dist/skin/"
+    cp frontend/ab/lang/*.txt "$dir/dist/lang/"
     echo "==> $dir/dist:"
     ls -l "$dir/dist" "$dir/dist/plugins" | sed 's/^/    /'
     file "$dir/dist/pcsx-ab" | sed 's/^/    /'
