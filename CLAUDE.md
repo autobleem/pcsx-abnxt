@@ -76,6 +76,8 @@ Phase 0 of `docs/port-plan.md` is done: the repositories exist, nothing is built
   when `access()` fails (pcsx-ab's `fclose(NULL)` segfault on the Pi).
 - **`spu.c`'s `tanh()` without `<math.h>`** read its result from r0 on hard-float ARM.
 - **CRLF**: pcsx-ab's sources are CRLF; upstream's are LF. Compare with `-w` / strip `\r` before diffing.
+  This clone runs with `git config core.autocrlf false` (set once per clone): upstream's files are LF and
+  must stay LF in the working copy, or every patch and every upstream merge fights the line endings.
 - **`CMAKE_TRY_COMPILE_PLATFORM_VARIABLES`**: a toolchain file's own `-D` variables are invisible inside
   `try_compile` unless listed there.
 - The PSC sysroot's `SDL_config.h` defines `SDL_VIDEO_DRIVER_X11` with no X11 headers; the console FindSDL2
