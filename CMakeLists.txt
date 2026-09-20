@@ -166,6 +166,8 @@ if (GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
         OUTPUT_VARIABLE _pcsxab_rev OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
     # -dirty by our own files only: the submodules are upstream's and never edited here, and on Windows
     # MSYS2's git and Git for Windows disagree about their line endings, which made every build "dirty"
+    execute_process(COMMAND ${GIT_EXECUTABLE} update-index -q --refresh --ignore-submodules
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} ERROR_QUIET OUTPUT_QUIET)
     execute_process(COMMAND ${GIT_EXECUTABLE} diff-index --quiet --ignore-submodules=all HEAD --
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         RESULT_VARIABLE _pcsxab_dirty ERROR_QUIET)
