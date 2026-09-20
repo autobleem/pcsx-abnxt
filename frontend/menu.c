@@ -2529,6 +2529,9 @@ static menu_entry e_menu_main[] =
 
 static void menu_leave_emu(void);
 
+/* AutoBleem's menu over this one, from the same translation unit */
+#include "ab/ab_menu.c"
+
 void menu_loop(void)
 {
 	static int warned_about_bios = 0;
@@ -2557,9 +2560,8 @@ void menu_loop(void)
 
 	in_set_config_int(0, IN_CFG_BLOCKING, 1);
 
-	do {
-		me_loop_d(e_menu_main, &sel, NULL, draw_frame_main);
-	} while (!ready_to_go && !g_emu_want_quit);
+	ab_menu_loop_d();	/* AutoBleem's menu, e_menu_main one level down (ab/ab_menu.c) */
+	(void)sel;
 
 	/* wait until menu, ok, back is released */
 	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK))

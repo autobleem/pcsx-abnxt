@@ -40,13 +40,17 @@ $keys = @{ esc=@(0x1B,0x01); return=@(0x0D,0x1C); backspace=@(0x08,0x0E); space=
            w=@(0x57,0x11); r=@(0x52,0x13); e=@(0x45,0x12); t=@(0x54,0x14)
            f1=@(0x70,0x3B); f2=@(0x71,0x3C); f3=@(0x72,0x3D); f4=@(0x73,0x3E); f5=@(0x74,0x3F); f6=@(0x75,0x40)
            f7=@(0x76,0x41); f8=@(0x77,0x42); f9=@(0x78,0x43); f10=@(0x79,0x44); f11=@(0x7A,0x57); f12=@(0x7B,0x58) }
+# the arrows are extended keys: without bit 24 in lParam SDL takes scancode 0x50 for keypad 2, not Down
+$extended = @('up','down','left','right')
 function KeyDown($h, $name) {
   $k = $keys[$name]; if ($null -eq $k) { "unknown key $name"; return }
-  [W]::PostMessage($h, 0x100, [IntPtr]$k[0], [IntPtr](($k[1] -shl 16) -bor 1)) | Out-Null
+  $ext = 0; if ($extended -contains $name) { $ext = 1 -shl 24 }
+  [W]::PostMessage($h, 0x100, [IntPtr]$k[0], [IntPtr](($k[1] -shl 16) -bor 1 -bor $ext)) | Out-Null
 }
 function KeyUp($h, $name) {
   $k = $keys[$name]; if ($null -eq $k) { return }
-  [W]::PostMessage($h, 0x101, [IntPtr]$k[0], [IntPtr](($k[1] -shl 16) -bor 1 -bor (1 -shl 30) -bor (1 -shl 31))) | Out-Null
+  $ext = 0; if ($extended -contains $name) { $ext = 1 -shl 24 }
+  [W]::PostMessage($h, 0x101, [IntPtr]$k[0], [IntPtr](($k[1] -shl 16) -bor 1 -bor $ext -bor (1 -shl 30) -bor (1 -shl 31))) | Out-Null
 }
 $shot = 0
 function Shot { $script:shot++; $b = New-Object System.Drawing.Bitmap 1920,1080; $g = [System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen(0,0,0,0,$b.Size); $b.Save("$Run\shot$script:shot.png"); $g.Dispose(); $b.Dispose() }
