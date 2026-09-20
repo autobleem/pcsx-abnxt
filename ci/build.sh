@@ -28,10 +28,7 @@ configure() { # configure BUILD_DIR ARGS...
             rm -rf "$dir"
         fi
     fi
-    # PCSXAB_PLATFORM=headless until the SDL2 platform exists (port-plan.md phase 2): upstream's frontend is
-    # SDL 1.2, which no target sysroot has - this builds and links everything but a window
-    cmake -S . -B "$dir" -G Ninja -DCMAKE_BUILD_TYPE=Release "${LAUNCHER[@]}" \
-        -DPCSXAB_PLATFORM=headless -DPCSXAB_SOUND_DRIVERS= "$@"
+    cmake -S . -B "$dir" -G Ninja -DCMAKE_BUILD_TYPE=Release "${LAUNCHER[@]}" "$@"
 }
 # sccache in front of the compiler when it is there (AutoBleem's build image has it and mounts the cache
 # from the host; AutoBleem's ci/build.sh does the same). AB_NO_SCCACHE=1 builds without.

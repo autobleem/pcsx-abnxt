@@ -20,11 +20,8 @@ if [ "${1:-}" = "--clean" ]; then
     rm -rf ./build_rpi
 fi
 mkdir -p build_rpi
-# PCSXAB_PLATFORM=headless until the SDL2 platform exists (port-plan.md phase 2): upstream's frontend is
-# SDL 1.2, which no target sysroot has - this builds and links everything but a window
 cmake -G Ninja -S . -B build_rpi -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_TOOLCHAIN_FILE=toolchains/rpi/RPitoolchain.cmake \
-    -DPCSXAB_PLATFORM=headless -DPCSXAB_SOUND_DRIVERS=
+    -DCMAKE_TOOLCHAIN_FILE=toolchains/rpi/RPitoolchain.cmake
 cmake --build build_rpi
 
 # a flat copy of what ships: the executable and the plugin .so's, nothing else from the build tree.

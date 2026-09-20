@@ -1,0 +1,334 @@
+/*
+ * The SDL2 platform of pcsx-abnxt: one window and one accelerated renderer on every target (Wayland on the
+ * PlayStation Classic, KMSDRM on a Raspberry Pi, the desktop on a PC), the emulator's frame and the menu
+ * as RGB565 buffers uploaded to a streaming texture (frontend/libpicofe/plat_sdl2.c), the keyboard and the
+ * game controllers through libpicofe's in_sdl2 / in_sdl2gc drivers. Replaces plat_sdl.c (upstream's SDL
+ * 1.2 platform, which stays in the tree untouched) for the AutoBleem targets.
+ *
+ * (C) Gražvydas "notaz" Ignotas, 2011-2013 (the plat_sdl.c this follows)
+ * (C) AutoBleem team, 2026
+ *
+ * This work is licensed under the terms of any of these licenses (at your option):
+ *  - GNU GPL, version 2 or later.
+ *  - GNU LGPL, version 2.1 or later.
+ * See the COPYING file in the top-level directory.
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <SDL.h>
+
+#include "../libpcsxcore/plugins.h"
+#include "libpicofe/input.h"
+#include "libpicofe/in_sdl2.h"
+#include "libpicofe/in_sdl2gc.h"
+#include "libpicofe/menu.h"
+#include "libpicofe/fonts.h"
+#include "libpicofe/plat_sdl2.h"
+#include "libpicofe/plat.h"
+#include "cspace.h"
+#include "plugin_lib.h"
+#include "plugin.h"
+#include "menu.h"
+#include "main.h"
+#include "plat.h"
+#include "revision.h"
+
+/* the keyboard: the same keys upstream's SDL 1.2 platform binds, by scancode */
+static const struct in_default_bind in_sdl2_defbinds[] = {
+  { SDL_SCANCODE_UP,     IN_BINDTYPE_PLAYER12, DKEY_UP },
+  { SDL_SCANCODE_DOWN,   IN_BINDTYPE_PLAYER12, DKEY_DOWN },
+  { SDL_SCANCODE_LEFT,   IN_BINDTYPE_PLAYER12, DKEY_LEFT },
+  { SDL_SCANCODE_RIGHT,  IN_BINDTYPE_PLAYER12, DKEY_RIGHT },
+  { SDL_SCANCODE_D,      IN_BINDTYPE_PLAYER12, DKEY_TRIANGLE },
+  { SDL_SCANCODE_Z,      IN_BINDTYPE_PLAYER12, DKEY_CROSS },
+  { SDL_SCANCODE_X,      IN_BINDTYPE_PLAYER12, DKEY_CIRCLE },
+  { SDL_SCANCODE_S,      IN_BINDTYPE_PLAYER12, DKEY_SQUARE },
+  { SDL_SCANCODE_V,      IN_BINDTYPE_PLAYER12, DKEY_START },
+  { SDL_SCANCODE_C,      IN_BINDTYPE_PLAYER12, DKEY_SELECT },
+  { SDL_SCANCODE_W,      IN_BINDTYPE_PLAYER12, DKEY_L1 },
+  { SDL_SCANCODE_R,      IN_BINDTYPE_PLAYER12, DKEY_R1 },
+  { SDL_SCANCODE_E,      IN_BINDTYPE_PLAYER12, DKEY_L2 },
+  { SDL_SCANCODE_T,      IN_BINDTYPE_PLAYER12, DKEY_R2 },
+  { SDL_SCANCODE_ESCAPE, IN_BINDTYPE_EMU, SACTION_ENTER_MENU },
+  { SDL_SCANCODE_F1,     IN_BINDTYPE_EMU, SACTION_SAVE_STATE },
+  { SDL_SCANCODE_F2,     IN_BINDTYPE_EMU, SACTION_LOAD_STATE },
+  { SDL_SCANCODE_F3,     IN_BINDTYPE_EMU, SACTION_PREV_SSLOT },
+  { SDL_SCANCODE_F4,     IN_BINDTYPE_EMU, SACTION_NEXT_SSLOT },
+  { SDL_SCANCODE_F5,     IN_BINDTYPE_EMU, SACTION_TOGGLE_FSKIP },
+  { SDL_SCANCODE_F6,     IN_BINDTYPE_EMU, SACTION_SCREENSHOT },
+  { SDL_SCANCODE_F7,     IN_BINDTYPE_EMU, SACTION_TOGGLE_FPS },
+  { SDL_SCANCODE_F8,     IN_BINDTYPE_EMU, SACTION_SWITCH_DISPMODE },
+  { SDL_SCANCODE_F11,    IN_BINDTYPE_EMU, SACTION_TOGGLE_FULLSCREEN },
+  { SDL_SCANCODE_BACKSPACE, IN_BINDTYPE_EMU, SACTION_FAST_FORWARD },
+  { 0, 0, 0 }
+};
+
+static const struct menu_keymap in_sdl2_key_map[] =
+{
+  { SDL_SCANCODE_UP,     PBTN_UP },
+  { SDL_SCANCODE_DOWN,   PBTN_DOWN },
+  { SDL_SCANCODE_LEFT,   PBTN_LEFT },
+  { SDL_SCANCODE_RIGHT,  PBTN_RIGHT },
+  { SDL_SCANCODE_RETURN, PBTN_MOK },
+  { SDL_SCANCODE_ESCAPE, PBTN_MBACK },
+  { SDL_SCANCODE_SEMICOLON,    PBTN_MA2 },
+  { SDL_SCANCODE_APOSTROPHE,   PBTN_MA3 },
+  { SDL_SCANCODE_LEFTBRACKET,  PBTN_L },
+  { SDL_SCANCODE_RIGHTBRACKET, PBTN_R },
+};
+
+static const struct in_pdata in_sdl2_platform_data = {
+  .defbinds  = in_sdl2_defbinds,
+  .key_map   = in_sdl2_key_map,
+  .kmap_size = sizeof(in_sdl2_key_map) / sizeof(in_sdl2_key_map[0]),
+};
+
+/* the pads: the driver's PlayStation-named buttons onto the emulator's - the same on every pad */
+static const struct in_default_bind in_sdl2gc_defbinds[] = {
+  { SDL2GC_DPAD_UP,      IN_BINDTYPE_PLAYER12, DKEY_UP },
+  { SDL2GC_DPAD_DOWN,    IN_BINDTYPE_PLAYER12, DKEY_DOWN },
+  { SDL2GC_DPAD_LEFT,    IN_BINDTYPE_PLAYER12, DKEY_LEFT },
+  { SDL2GC_DPAD_RIGHT,   IN_BINDTYPE_PLAYER12, DKEY_RIGHT },
+  { SDL2GC_BTN_TRIANGLE, IN_BINDTYPE_PLAYER12, DKEY_TRIANGLE },
+  { SDL2GC_BTN_CROSS,    IN_BINDTYPE_PLAYER12, DKEY_CROSS },
+  { SDL2GC_BTN_CIRCLE,   IN_BINDTYPE_PLAYER12, DKEY_CIRCLE },
+  { SDL2GC_BTN_SQUARE,   IN_BINDTYPE_PLAYER12, DKEY_SQUARE },
+  { SDL2GC_BTN_START,    IN_BINDTYPE_PLAYER12, DKEY_START },
+  { SDL2GC_BTN_SELECT,   IN_BINDTYPE_PLAYER12, DKEY_SELECT },
+  { SDL2GC_BTN_L1,       IN_BINDTYPE_PLAYER12, DKEY_L1 },
+  { SDL2GC_BTN_R1,       IN_BINDTYPE_PLAYER12, DKEY_R1 },
+  { SDL2GC_BTN_L2,       IN_BINDTYPE_PLAYER12, DKEY_L2 },
+  { SDL2GC_BTN_R2,       IN_BINDTYPE_PLAYER12, DKEY_R2 },
+  { SDL2GC_BTN_L3,       IN_BINDTYPE_PLAYER12, DKEY_L3 },
+  { SDL2GC_BTN_R3,       IN_BINDTYPE_PLAYER12, DKEY_R3 },
+  { SDL2GC_BTN_PS,       IN_BINDTYPE_EMU,      SACTION_ENTER_MENU },
+  { 0, 0, 0 }
+};
+
+static const struct in_pdata in_sdl2gc_platform_data = {
+  .defbinds  = in_sdl2gc_defbinds,
+};
+
+/* where a gamecontrollerdb.txt may be: the AutoBleem kernel's, the launcher's next to the emulator's
+ * resources, one in the working directory */
+static const char * const controller_db_files[] = {
+  "/etc/autobleem/gamecontrollerdb.txt",
+  "/media/Autobleem/bin/autobleem/gamecontrollerdb.txt",
+  "gamecontrollerdb.txt",
+  NULL
+};
+
+static const char *hwfilters[] = { "linear", "nearest", NULL };
+
+static int psx_w = 256, psx_h = 240;	/* the emulator's output as plat_gvideo_set_mode() was told it */
+static void *shadow_fb;			/* the frame the GPU plugin draws into, RGB565 */
+static void *menu_fb;			/* what the menu draws into, RGB565, the window's size */
+static void *menubg_img;		/* the last frame, the menu's background */
+static int in_menu;
+static int fullscreen_old;
+
+static void quit_cb(void)
+{
+  emu_core_ask_exit();
+}
+
+/* the window's output size changed: the menu's canvas and the layer the frame is scaled into follow */
+static void resize_cb(int w, int h)
+{
+  g_menuscreen_w = w;
+  g_menuscreen_h = h;
+  g_menuscreen_pp = w;
+  free(menu_fb);
+  menu_fb = calloc(w * h, 2);
+  if (menu_fb == NULL) {
+    fprintf(stderr, "OOM\n");
+    exit(1);
+  }
+  pl_update_layer_size(psx_w, psx_h, w, h);
+  if (in_menu)
+    g_menuscreen_ptr = menu_fb;
+}
+
+/* every pad is a player's analog sticks too: player 1's on in_adev[0] (left) / [1] (right) */
+static void pads_changed(int pad_count)
+{
+  int dev = in_sdl2gc_dev_id(1);
+  in_adev[0] = in_adev[1] = dev;
+  in_adev_axis[0][0] = SDL2GC_AXIS_LX; in_adev_axis[0][1] = SDL2GC_AXIS_LY;
+  in_adev_axis[1][0] = SDL2GC_AXIS_RX; in_adev_axis[1][1] = SDL2GC_AXIS_RY;
+  in_adev_is_nublike[0] = in_adev_is_nublike[1] = 0;
+  printf("plat_sdl2: %d pad(s)\n", pad_count);
+}
+
+static void sdl_event_handler(void *event_)
+{
+  plat_sdl2_event_handler(event_);
+}
+
+static void get_layer_pos(int *x, int *y, int *w, int *h)
+{
+  *x = g_layer_x;
+  *y = g_layer_y;
+  *w = g_layer_w;
+  *h = g_layer_h;
+}
+
+static void plugin_update(void)
+{
+  // used by some plugins...
+  pl_rearmed_cbs.screen_w = plat_sdl2_win_w;
+  pl_rearmed_cbs.screen_h = plat_sdl2_win_h;
+  plugin_call_rearmed_cbs();
+}
+
+void plat_init(void)
+{
+  int fullscreen, ret;
+
+  plat_sdl2_quit_cb = quit_cb;
+  plat_sdl2_resize_cb = resize_cb;
+
+#if defined(__arm__) || defined(__aarch64__)
+  fullscreen = 1;	/* the console and the Pi: the whole display, whatever its mode */
+#else
+  fullscreen = plat_target.vout_fullscreen;
+#endif
+  ret = plat_sdl2_init("PCSX-ReARMed " REV, 1280, 720, fullscreen, g_opts & OPT_VSYNC);
+  if (ret != 0)
+    exit(1);
+  plat_target.vout_fullscreen = fullscreen_old = plat_sdl2_is_fullscreen();
+
+  // alloc enough for double res. rendering
+  shadow_fb = calloc(1024 * 512, 2);
+  menubg_img = calloc(1024 * 512, 2);
+  if (shadow_fb == NULL || menubg_img == NULL) {
+    fprintf(stderr, "OOM\n");
+    exit(1);
+  }
+  resize_cb(plat_sdl2_win_w, plat_sdl2_win_h);
+  in_menu = 1;
+
+  in_sdl2_init(&in_sdl2_platform_data, sdl_event_handler);
+  in_sdl2gc_init(&in_sdl2gc_platform_data, controller_db_files, pads_changed);
+  in_probe();
+
+  pl_rearmed_cbs.only_16bpp = 1;
+  pl_rearmed_cbs.pl_get_layer_pos = get_layer_pos;
+  plat_target.hwfilters = hwfilters;
+  plugin_update();
+}
+
+void plat_finish(void)
+{
+  free(shadow_fb);
+  shadow_fb = NULL;
+  free(menubg_img);
+  menubg_img = NULL;
+  free(menu_fb);
+  menu_fb = NULL;
+  plat_sdl2_finish();
+  SDL_Quit();
+}
+
+/* the menu's "Fullscreen mode" and the F11 action both just flip plat_target.vout_fullscreen */
+static void check_fullscreen(void)
+{
+  if (plat_target.vout_fullscreen != fullscreen_old) {
+    plat_sdl2_set_fullscreen(plat_target.vout_fullscreen);
+    plat_target.vout_fullscreen = fullscreen_old = plat_sdl2_is_fullscreen();
+    plugin_update();
+  }
+}
+
+void plat_gvideo_open(int is_pal)
+{
+}
+
+/* plugin_lib worked out g_layer_* for this size against g_menuscreen_w/h before calling; the GPU draws
+ * into shadow_fb from here on (pl_plat_blit stays NULL: plugin_lib converts and blits by itself) */
+void *plat_gvideo_set_mode(int *w, int *h, int *bpp)
+{
+  psx_w = *w;
+  psx_h = *h;
+  *bpp = 16;
+  memset(shadow_fb, 0, psx_w * psx_h * 2);
+  return shadow_fb;
+}
+
+void *plat_gvideo_flip(void)
+{
+  SDL_Rect dst = { g_layer_x, g_layer_y, g_layer_w, g_layer_h };
+
+  check_fullscreen();
+  plat_sdl2_present(shadow_fb, psx_w, psx_h, psx_w, &dst, plat_target.hwfilter == 0);
+  return shadow_fb;
+}
+
+void plat_gvideo_close(void)
+{
+}
+
+void plat_video_menu_enter(int is_rom_loaded)
+{
+  int d;
+
+  in_menu = 1;
+  /* the last frame is the menu's background; pl_vout_buf points at it while the menu is up */
+  memcpy(menubg_img, shadow_fb, psx_w * psx_h * 2);
+  pl_vout_buf = menubg_img;
+
+  for (d = 0; d < IN_MAX_DEVS; d++)
+    in_set_config_int(d, IN_CFG_ANALOG_MAP_ULDR, 1);
+}
+
+void plat_video_menu_begin(void)
+{
+  check_fullscreen();
+  g_menuscreen_ptr = menu_fb;
+}
+
+void plat_video_menu_end(void)
+{
+  plat_sdl2_present(menu_fb, g_menuscreen_w, g_menuscreen_h, g_menuscreen_pp, NULL, 1);
+  g_menuscreen_ptr = NULL;
+}
+
+void plat_video_menu_leave(void)
+{
+  int d;
+
+  in_menu = 0;
+  check_fullscreen();
+  pl_update_layer_size(psx_w, psx_h, g_menuscreen_w, g_menuscreen_h);
+  plat_sdl2_clear();
+
+  for (d = 0; d < IN_MAX_DEVS; d++)
+    in_set_config_int(d, IN_CFG_ANALOG_MAP_ULDR, 0);
+}
+
+void *plat_prepare_screenshot(int *w, int *h, int *bpp)
+{
+  *w = psx_w;
+  *h = psx_h;
+  *bpp = 16;
+  return shadow_fb;
+}
+
+/* pad.c's values, as libretro.c maps them: high is the strong motor's 0..255, low the weak one's on/off;
+ * called only on a change, so the rumble runs until the next call turns it down */
+void plat_trigger_vibrate(int pad, int low, int high)
+{
+  if (!in_enable_vibration)
+    return;
+  in_sdl2gc_rumble(pad + 1, low ? 0xffff : 0, high << 8, 5000);
+}
+
+void plat_minimize(void)
+{
+  SDL_MinimizeWindow(plat_sdl2_window);
+}
+
+// vim:shiftwidth=2:expandtab
