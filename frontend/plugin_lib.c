@@ -280,6 +280,7 @@ static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
 	psx_w = raw_w;
 	psx_h = raw_h;
 	psx_bpp = bpp;
+	fprintf(stderr, "video mode: %dx%d (psx %dx%d) %d bpp\n", w, h, raw_w, raw_h, bpp);
 	vout_w = w;
 	vout_h = h;
 	vout_bpp = bpp;
@@ -399,6 +400,7 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 	if (dest == NULL)
 		goto out;
 
+
 	dest += doffs * 2;
 
 	if (x + w > pl_vout_w)
@@ -462,8 +464,10 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 			2048, dstride * 2, h);
 	}
 #endif
-	else if (scanlines != 0 && scanline_level != 100 && !enhres && psx_bpp == 16)
+	else if (scanlines != 0 && scanline_level != 100 && psx_bpp == 16)
 	{
+		// an enhanced (2x) frame comes from the plugin's own buffer, which does not wrap at 1 MB
+		unsigned int vram_mask = enhres ? ~0 : 0xfffff;
 		int h2, l = scanline_level * 2048 / 100;
 		int stride_0 = pl_vout_scale_h >= 2 ? 0 : sstride;
 
@@ -472,13 +476,13 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 		{
 			for (h2 = scanlines; h2 > 0 && h1 > 0; h2--, h1--) {
 				bgr555_to_rgb565(dest, vram + vram_ofs, w);
-				vram_ofs = (vram_ofs + stride_0) & 0xfffff;
+				vram_ofs = (vram_ofs + stride_0) & vram_mask;
 				dest += dstride * 2;
 			}
 
 			for (h2 = scanlines; h2 > 0 && h1 > 0; h2--, h1--) {
 				bgr555_to_rgb565_b(dest, vram + vram_ofs, w, l);
-				vram_ofs = (vram_ofs + sstride) & 0xfffff;
+				vram_ofs = (vram_ofs + sstride) & vram_mask;
 				dest += dstride * 2;
 			}
 		}

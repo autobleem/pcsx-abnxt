@@ -94,4 +94,7 @@ void ab_config_loaded(int is_game)
 	if (plat_target.hwfilters != NULL)
 		plat_target.hwfilter = ab_opts.filter ? 0 : 1;	/* hwfilters[] = { "linear", "nearest" } */
 	g_scaler = ab_opts.ratio ? SCALE_FULLSCREEN : SCALE_4_3;
+	fprintf(stderr, "autobleem: %s config: filter=%s ratio=%s boot logo=%s scanlines=%d\n",
+		is_game ? "game" : "global", plat_target.hwfilter == 0 ? "linear" : "nearest",
+		ab_opts.ratio ? "16:9" : "4:3", Config.SlowBoot ? "shown" : "skipped", scanlines);
 }
