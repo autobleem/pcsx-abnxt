@@ -115,7 +115,7 @@ static int cd_buf_count;
 extern int g_autostateld_opt;
 static int menu_iopts[9];
 int g_opts, g_scaler, g_gamma = 100;
-int scanlines, scanline_level = 20;
+int scanlines, scanline_level = 80;
 int soft_scaling, analog_deadzone; // for Caanoo
 int soft_filter;
 int in_evdev_allow_abs_only attr_weak; // FIXME
@@ -362,7 +362,7 @@ static void menu_set_defconfig(void)
 	soft_scaling = 1;
 	soft_filter = 0;
 	scanlines = 0;
-	scanline_level = 20;
+	scanline_level = 80;
 #ifdef MIYOO
 	plat_target.vout_fullscreen = 1;
 #else
