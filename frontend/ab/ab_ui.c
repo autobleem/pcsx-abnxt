@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <unistd.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #define STBTT_STATIC
@@ -36,6 +37,18 @@ static const char *english[AB_STR_COUNT] = {
 	"Select",
 	"Back",
 };
+
+/* where skin/, lang/ and fonts/ are: the run directory first - AutoBleem's launch scripts link them there
+ * next to .pcsx/, bios/ and plugins/, and copy the binary to /tmp/pcsx, so the executable's own directory
+ * (upstream's data dir, emu_make_data_path) is only right for a build run from where it was built */
+static void data_path(char *path, size_t size, const char *end)
+{
+	if (access(end, R_OK) == 0) {
+		snprintf(path, size, "%s", end);
+		return;
+	}
+	emu_make_data_path(path, end, size);
+}
 
 static char *translated[AB_STR_COUNT];
 static char font_name[128];		/* |@font| from the language file, a file in skin/ or fonts/ */
@@ -78,7 +91,7 @@ static void read_strings(const char *language)
 	if (language == NULL || language[0] == 0 || strchr(language, '/') != NULL)
 		return;
 	snprintf(end, sizeof(end), "lang/%s.txt", language);
-	emu_make_data_path(path, end, sizeof(path));
+	data_path(path, sizeof(path), end);
 	f = fopen(path, "r");
 	if (f == NULL) {
 		SysPrintf("autobleem: no %s, the emulator's screens are in English\n", path);
@@ -96,7 +109,7 @@ static int load_font_file(const char *end)
 	FILE *f;
 	long size;
 
-	emu_make_data_path(path, end, sizeof(path));
+	data_path(path, sizeof(path), end);
 	f = fopen(path, "rb");
 	if (f == NULL)
 		return 0;
@@ -457,7 +470,7 @@ int ab_ui_background(unsigned short *dst, int w, int h)
 
 	if (missing || w <= 0 || h <= 0)
 		return 0;
-	emu_make_data_path(path, "skin/ab_background.jpg", sizeof(path));
+	data_path(path, sizeof(path), "skin/ab_background.jpg");
 	file = read_file(path, &size);
 	if (file == NULL) {
 		SysPrintf("autobleem: no %s, the menu has a plain background\n", path);
