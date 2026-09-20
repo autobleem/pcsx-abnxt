@@ -112,6 +112,9 @@ static void set_default_paths(void)
 	// prefer bios in working dir for compatibility
 	if (!strcmp(home, ".") && !stat("bios", &st))
 		strcpy(Config.BiosDir, "bios");
+	// AutoBleem's launch scripts put plugins/ next to .pcsx/ and bios/ in the working dir as well
+	if (!strcmp(home, ".") && !stat("plugins", &st))
+		strcpy(Config.PluginsDir, "plugins");
 
 	SysPrintf("dirs: profile=%s" PCSX_DOT_DIR ", bios=%s, plugins=%s\n",
 		home, Config.BiosDir, Config.PluginsDir);

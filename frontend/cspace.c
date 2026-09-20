@@ -136,6 +136,29 @@ void bgr555_to_rgb565(void * __restrict__ dst_, const void * __restrict__ src_,
 
 #endif
 
+#if !(defined(HAVE_bgr555_to_rgb565) && defined(__ARM_NEON__))
+/* the darkened rows of the scanline effect (cspace_neon.S has the NEON one): brightness2k 0-0x800 = 0-1.0 */
+void bgr555_to_rgb565_b(void * __restrict__ dst_, const void * __restrict__ src_,
+	int pixels, int brightness2k)
+{
+	const uint16_t * __restrict__ src = src_;
+	uint16_t * __restrict__ dst = dst_;
+	int x;
+
+	for (x = 0; x < pixels; x++) {
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+		uint16_t p = SWAP16(src[x]);
+#else
+		uint16_t p = src[x];
+#endif
+		unsigned r = ((p      ) & 0x1f) * brightness2k >> 11;
+		unsigned g = ((p >>  5) & 0x1f) * brightness2k >> 11;
+		unsigned b = ((p >> 10) & 0x1f) * brightness2k >> 11;
+		dst[x] = (r << 11) | (g << 6) | b;
+	}
+}
+#endif
+
 static inline void bgr888_to_rgb888_one(uint8_t * __restrict__ dst,
 	const uint8_t * __restrict__ src)
 {

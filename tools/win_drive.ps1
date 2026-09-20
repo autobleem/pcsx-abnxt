@@ -6,10 +6,12 @@
 #     a number waits that many seconds, a name presses that key; screenshots land in build_win\run\shotN.png
 #   keys: esc up down left right return backspace f1..f12 z x s d c v w r e t (the default binds);
 #   'close' sends the window's close button
+#   -AttachPid N drives an already running emulator (one started under gdb, for a backtrace of a crash a key causes)
 param(
   [string]$Game = "D:/AB/Games/Crash Bandicoot (U)/SCUS-94900.cue",
   [string]$Sequence = "12;esc;2",
-  [string]$EmuArgs = ""
+  [string]$EmuArgs = "",
+  [int]$AttachPid = 0          # drive an emulator someone else started (gdb, say) instead of starting one
 )
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Run = Join-Path $Root "build_win\run"
@@ -58,7 +60,8 @@ function Shot { $script:shot++; $b = New-Object System.Drawing.Bitmap 1920,1080;
 Set-Location $Run
 Remove-Item "$Run\shot*.png" -ErrorAction SilentlyContinue
 $argl = @('-cdfile', "`"$Game`"") + ($EmuArgs -split ' ' | Where-Object { $_ -ne "" })
-$p = Start-Process -FilePath $Exe -ArgumentList $argl -RedirectStandardOutput "$Run\out.txt" -RedirectStandardError "$Run\err.txt" -PassThru
+if ($AttachPid -ne 0) { $p = Get-Process -Id $AttachPid }
+else { $p = Start-Process -FilePath $Exe -ArgumentList $argl -RedirectStandardOutput "$Run\out.txt" -RedirectStandardError "$Run\err.txt" -PassThru }
 $h = [IntPtr]::Zero
 foreach ($step in $Sequence.Split(';')) {
   $step = $step.Trim()
@@ -69,4 +72,5 @@ foreach ($step in $Sequence.Split(';')) {
   Start-Sleep -Milliseconds 700
   Shot
 }
-if (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; "killed (was running)" } else { "exited $($p.ExitCode)" }
+if ($AttachPid -ne 0) { "left running" }
+elseif (-not $p.HasExited) { Stop-Process -Id $p.Id -Force; "killed (was running)" } else { "exited $($p.ExitCode)" }
