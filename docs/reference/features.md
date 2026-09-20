@@ -14,7 +14,7 @@ SDK export is CRLF with re-indented functions; `diff -w` hides that):
   `vector.[ch]`).
 
 The line numbers below point into those patches (`sed -n '5132,5160p' pcsx-ab-delta-2017.patch`). The
-decisions are in `../port-plan.md`; this file only says what is there.
+decisions are in the CLAUDE.md (the plan itself is in the git history); this file only says what is there.
 
 ## Console integration (Sony)
 
