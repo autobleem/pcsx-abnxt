@@ -5,6 +5,7 @@
 #   dist/packages/pcsx-abnxt-<version>-psc.tar.gz         build_psc/dist    Autobleem/bin/emu/ on the stick
 #   dist/packages/pcsx-abnxt-<version>-rpi-armhf.tar.gz   build_rpi/dist    Autobleem/bin/emu/ on a 32-bit Pi
 #   dist/packages/pcsx-abnxt-<version>-rpi-arm64.tar.gz   build_rpi64/dist  ... on a 64-bit Pi
+#   dist/packages/pcsx-abnxt-<version>-pcusb.tar.gz       build_pcusb/dist   AutoBleem's 32-bit PC USB stick
 #   dist/packages/pcsx-abnxt-<version>-win64.zip          build_win_rel (or build_win)  the exe, its DLLs, the plugins, the skin
 #   dist/packages/pcsx-abnxt-<version>.json               what is in them: version, commit, date, sha256 per file
 #
@@ -70,6 +71,7 @@ echo "pcsx-abnxt $VERSION ($COMMIT, $DATE):"
 pack_linux build_psc/dist psc
 pack_linux build_rpi/dist rpi-armhf
 pack_linux build_rpi64/dist rpi-arm64
+pack_linux build_pcusb/dist pcusb
 pack_windows
 
 # the manifest
