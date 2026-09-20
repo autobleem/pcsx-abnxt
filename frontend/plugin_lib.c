@@ -28,6 +28,7 @@
 #include "main.h"
 #include "plat.h"
 #include "pcnt.h"
+#include "ab/ab_buttons.h"
 #include "pl_gun_ts.h"
 #include "cspace.h"
 #include "psemu_plugin_defs.h"
@@ -785,6 +786,7 @@ void pl_frame_limit(void)
 	/* doing input here because the pad is polled
 	 * thousands of times per frame for some reason */
 	update_input();
+	ab_frame_tick();
 
 	pcnt_end(PCNT_ALL);
 	gettimeofday(&now, 0);

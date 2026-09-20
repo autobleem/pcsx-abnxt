@@ -36,6 +36,7 @@
 #include "revision.h"
 #include "ab/ab_config.h"
 #include "ab/ab_session.h"
+#include "ab/ab_buttons.h"
 
 #if defined(__EMSCRIPTEN__)
 #define DO_CPU_CHECKS 0
@@ -292,6 +293,7 @@ do_state_slot:
 		snprintf(hud_msg, sizeof(hud_msg), "ANALOG %s", ret ? "ON" : "OFF");
 		break;
 	default:
+		ab_emu_action(emu_action);
 		return;
 	}
 

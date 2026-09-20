@@ -55,6 +55,11 @@ int ab_args_take(int argc, char *argv[])
 {
 	int i, out = 1;
 
+	/* the log is read after a crash or a kill more often than not; line buffering is full buffering on
+	 * the Windows CRT, so unbuffered it is (the console's AB_*.txt logs are the same) */
+	setvbuf(stdout, NULL, _IONBF, 0);
+	setvbuf(stderr, NULL, _IONBF, 0);
+
 	for (i = 1; i < argc; i++) {
 		if (take_int("-filter", &ab_opts.filter, 0, 1, argc, argv, &i)
 		    || take_int("-ratio", &ab_opts.ratio, 0, 1, argc, argv, &i)

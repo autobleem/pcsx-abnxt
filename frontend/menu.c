@@ -931,6 +931,8 @@ me_bind_action emuctrl_actions[] =
 	{ "Volume Down      ", 1 << SACTION_VOLUME_DOWN },
 #endif
 	{ "Analog toggle    ", 1 << SACTION_ANALOG_TOGGLE },
+	{ "CD Change button ", 1 << SACTION_AB_CD_CHANGE },
+	{ "RESET button     ", 1 << SACTION_AB_RESET },
 	{ NULL,                0 }
 };
 
