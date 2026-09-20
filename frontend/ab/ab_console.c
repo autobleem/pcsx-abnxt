@@ -109,14 +109,18 @@ static void *temperature_watch(void *unused)
 	return NULL;
 }
 
+int ab_console_present(void)
+{
+	return access(AB_CPU_TEMP_FILE, R_OK) == 0 || access(AB_POWER_DIR, R_OK) == 0;
+}
+
 int ab_console_start(void)
 {
 	pthread_t th;
 	pthread_attr_t attr;
 	struct stat st;
-	int is_console = access(AB_CPU_TEMP_FILE, R_OK) == 0 || access(AB_POWER_DIR, R_OK) == 0;
 
-	if (!is_console) {
+	if (!ab_console_present()) {
 		printf("autobleem: no power daemon (not a PlayStation Classic), nothing to watch\n");
 		return 0;
 	}
@@ -135,6 +139,11 @@ int ab_console_start(void)
 }
 
 #else /* not Linux: nothing to watch */
+
+int ab_console_present(void)
+{
+	return 0;
+}
 
 int ab_console_start(void)
 {

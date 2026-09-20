@@ -726,7 +726,7 @@ static void update_input(void)
 			;
 		emu_act = which;
 	}
-	emu_set_action(emu_act);
+	emu_set_action(ab_filter_action(emu_act));
 
 	in_keystate[0] = actions[IN_BINDTYPE_PLAYER12] & 0xffff;
 	in_keystate[1] = (actions[IN_BINDTYPE_PLAYER12] >> 16) & 0xffff;

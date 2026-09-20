@@ -11,6 +11,7 @@
 
 #include "../../libpcsxcore/psxcommon.h"
 #include "../../libpcsxcore/r3000a.h"
+#include "../libpicofe/plat.h"
 #include "../main.h"
 #include "ab_buttons.h"
 #include "ab_autosave.h"
@@ -22,6 +23,10 @@ extern enum sched_action emu_action, emu_action_old;
 
 static int reset_held;		/* a Reset that waits for a memory-card write to finish */
 static int power_off_seen, overheat_seen;
+
+#define AB_MENU_HOLD_MS   2000	/* the menu button held this long is Reset, off the console */
+#define AB_MENU_HINT_MS   500	/* ...and says so on the HUD from here */
+static const char hold_hint[] = "HOLD TO EXIT";
 
 void ab_request_action(int action)
 {
@@ -39,6 +44,45 @@ static void reset_now(const char *why)
 	SysPrintf("autobleem: %s - leaving with the resume point\n", why);
 	ab_session_exit_from_ring();
 	emu_core_ask_exit();
+}
+
+int ab_filter_action(int action)
+{
+	static int on_console = -1;
+	static int held, fired;
+	static unsigned int held_since;
+	unsigned int now;
+
+	if (on_console < 0)
+		on_console = ab_console_present();
+	if (on_console)
+		return action;
+
+	now = plat_get_ticks_ms();
+	if (action == SACTION_ENTER_MENU) {
+		if (!held) {
+			held = 1;
+			fired = 0;
+			held_since = now;
+		} else if (!fired && now - held_since >= AB_MENU_HOLD_MS) {
+			fired = 1;
+			hud_msg[0] = 0;
+			return SACTION_AB_RESET;
+		} else if (!fired && now - held_since >= AB_MENU_HINT_MS && hud_msg[0] == 0) {
+			snprintf(hud_msg, sizeof(hud_msg), "%s", hold_hint);
+			hud_new_msg = 2;
+		}
+		return SACTION_NONE;
+	}
+	if (held) {
+		/* released: a press, unless the hold already went out as Reset */
+		held = 0;
+		if (strcmp(hud_msg, hold_hint) == 0)
+			hud_msg[0] = 0;
+		if (!fired)
+			return SACTION_ENTER_MENU;
+	}
+	return action;
 }
 
 int ab_emu_action(int action)

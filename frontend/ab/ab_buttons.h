@@ -11,6 +11,11 @@
  * A Reset that lands while the game is writing its memory card is held until the write is over, so the
  * resume point never contains half a card (Sony's memcardResetFlag).
  *
+ * Off the console there are no front buttons, and leaving a game meant the menu, Exit, Cross. So there
+ * the menu button (the pad's Home, Select+Start, Escape) does both: a press opens the menu when it is
+ * released, a hold of 2 s is Reset (ab_filter_action). On the console the button opens the menu at once,
+ * as before - its Reset is on the front.
+ *
  * Everything that touches the emulator's state (a snapshot, a disc change, the exit) runs as an emulator
  * action, between two CPU slices; the frame tick only decides and asks (ab_request_action).
  *
@@ -30,5 +35,9 @@ void ab_frame_tick(void);
 
 /* asks the emulator to run <action> (SACTION_*) as soon as the current slice ends, from the main thread */
 void ab_request_action(int action);
+
+/* update_input()'s emulator action, with the menu button's press/hold told apart (see the top); called
+ * every frame with SACTION_NONE when nothing is pressed */
+int ab_filter_action(int action);
 
 #endif

@@ -3,7 +3,8 @@
 # collect the log. For smoke tests from a script.
 #
 #   tools\win_drive.ps1 -Game "D:/AB/Games/X/game.cue" -Sequence "12;esc;2;down;down;1"
-#     a number waits that many seconds, a name presses that key; screenshots land in build_win\run\shotN.png
+#     a number waits that many seconds, a name presses that key, 'name:ms' holds it that long (the menu
+#     button's hold = Reset); screenshots land in build_win\run\shotN.png
 #   keys: esc up down left right return backspace f1..f12 z x s d c v w r e t (the default binds);
 #   'close' sends the window's close button
 #   -AttachPid N drives an already running emulator (one started under gdb, for a backtrace of a crash a key causes)
@@ -68,7 +69,9 @@ foreach ($step in $Sequence.Split(';')) {
   if ($step -match '^\d+(\.\d+)?$') { Start-Sleep ([double]$step); continue }
   if ($h -eq [IntPtr]::Zero) { $h = [W]::FindByPid($p.Id, "PCSX"); "window handle: $h" }
   if ($step -eq 'close') { [W]::PostMessage($h, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null; Start-Sleep 3; continue }   # WM_CLOSE
-  KeyDown $h $step; Start-Sleep -Milliseconds 120; KeyUp $h $step
+  $hold = 120
+  if ($step -match '^(\w+):(\d+)$') { $step = $Matches[1]; $hold = [int]$Matches[2] }
+  KeyDown $h $step; Start-Sleep -Milliseconds $hold; KeyUp $h $step
   Start-Sleep -Milliseconds 700
   Shot
 }

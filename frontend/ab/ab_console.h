@@ -23,6 +23,8 @@
 #define AB_CPU_TEMP_LIMIT_KEY   "CPU_AUTO_START_TEMP"
 #define AB_CPU_TEMP_LIMIT_DEFAULT 80000
 
+/* 1 when the power daemon's files are there - this is a PlayStation Classic, with its front buttons */
+int ab_console_present(void);
 /* starts the watchers; 1 when the power daemon's files are there (a console), 0 elsewhere */
 int ab_console_start(void);
 /* set by the watcher threads, read from the main thread's frame tick */

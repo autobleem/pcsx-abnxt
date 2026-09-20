@@ -44,7 +44,13 @@ gives libpicofe's `g_menubg_*` a darkened copy of the same art, which is what th
 its pages draw over, in upstream's own 8x10 font. `plat_sdl2.c`'s `resize_cb` re-allocates the
 `g_menubg_*` buffers with the canvas (F11 on a PC used to read past them). The picker and the message
 screens draw on the same screen (`ab_screen_begin`, the discs on a panel, the hints on the bar).
-`make_rpi*.sh`'s dist step ships `skin/` + `lang/` like `ci/build.sh`'s.
+`make_rpi*.sh`'s dist step ships `skin/` + `lang/` like `ci/build.sh`'s. **`ab_ui` looks in the run
+directory first** (`data_path`): the launch scripts copy the binary to `/tmp/pcsx` and link `skin/`,
+`lang/`, `fonts/` into `/tmp/runpcsx`, so `emu_make_data_path` (exe-relative) found nothing on the Pi.
+**The menu button off the console** (`ab_filter_action`, hooked into `update_input()`): no front buttons
+there, so a press opens the menu on release and a **2 s hold is Reset** (the HUD says "HOLD TO EXIT" from
+0.5 s; the Exit row's help says so); on the console (`ab_console_present()`) the button opens the menu at
+once as before. `tools/win_drive.ps1` holds a key with `name:ms`.
 
 **The disc picker and the emulator's own language** (2026-09-20, phase 5 complete): the Open button and
 the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the menu's screen - the set's discs in
