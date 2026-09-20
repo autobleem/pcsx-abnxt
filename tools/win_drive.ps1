@@ -4,11 +4,12 @@
 #
 #   tools\win_drive.ps1 -Game "D:/AB/Games/X/game.cue" -Sequence "12;esc;2;down;down;1"
 #     a number waits that many seconds, a name presses that key; screenshots land in build_win\run\shotN.png
-#   keys: esc up down left right return backspace f1..f12 z x s d c v w r e t (the default binds)
+#   keys: esc up down left right return backspace f1..f12 z x s d c v w r e t (the default binds);
+#   'close' sends the window's close button
 param(
   [string]$Game = "D:/AB/Games/Crash Bandicoot (U)/SCUS-94900.cue",
   [string]$Sequence = "12;esc;2",
-  [string]$Args = ""
+  [string]$EmuArgs = ""
 )
 $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $Run = Join-Path $Root "build_win\run"
@@ -52,13 +53,14 @@ function Shot { $script:shot++; $b = New-Object System.Drawing.Bitmap 1920,1080;
 
 Set-Location $Run
 Remove-Item "$Run\shot*.png" -ErrorAction SilentlyContinue
-$argl = @('-cdfile', "`"$Game`"") + ($Args -split ' ' | Where-Object { $_ -ne "" })
+$argl = @('-cdfile', "`"$Game`"") + ($EmuArgs -split ' ' | Where-Object { $_ -ne "" })
 $p = Start-Process -FilePath $Exe -ArgumentList $argl -RedirectStandardOutput "$Run\out.txt" -RedirectStandardError "$Run\err.txt" -PassThru
 $h = [IntPtr]::Zero
 foreach ($step in $Sequence.Split(';')) {
   $step = $step.Trim()
   if ($step -match '^\d+(\.\d+)?$') { Start-Sleep ([double]$step); continue }
   if ($h -eq [IntPtr]::Zero) { $h = [W]::FindByPid($p.Id, "PCSX"); "window handle: $h" }
+  if ($step -eq 'close') { [W]::PostMessage($h, 0x10, [IntPtr]::Zero, [IntPtr]::Zero) | Out-Null; Start-Sleep 3; continue }   # WM_CLOSE
   KeyDown $h $step; Start-Sleep -Milliseconds 120; KeyUp $h $step
   Start-Sleep -Milliseconds 700
   Shot

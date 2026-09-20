@@ -46,6 +46,7 @@
 #include "compiler_features.h"
 #include "arm_features.h"
 #include "revision.h"
+#include "ab/ab_config.h"
 
 #define REARMED_BIRTHDAY_TIME 1293306830	/* 25 Dec 2010 */
 #if defined(__linux__) && (!defined(__SIZEOF_POINTER__) || __SIZEOF_POINTER__ == 4)
@@ -760,6 +761,7 @@ fail:
 	if (strcmp(mcd1_old, Config.Mcd1) || strcmp(mcd2_old, Config.Mcd2))
 		LoadMcds(Config.Mcd1, Config.Mcd2);
 
+	ab_config_loaded(is_game);
 	return ret;
 }
 
