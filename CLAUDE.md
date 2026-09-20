@@ -13,8 +13,36 @@ change (commit messages are prose).
 Phases 0-4 and 6 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the
 SDL2 platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave
 ring and the power daemon, the in-game menu, and phase 5's disc change without its picker screen. All of it
-verified on Windows only; the first runs on the Pi 400 and the console are the next thing, then phase 5's
-picker and phase 7 (the compatibility pass).
+verified on Windows first; **running on the Pi 400 since 2026-09-20** (64-bit, `Autobleem/bin/emunxt/`,
+the launcher's Options -> "PS1 Emulator") - Crash Bandicoot and Harvest Moon with the real BIOS, the
+menu, scanlines, the pad. The console is still unrun. Next: phase 5's picker and phase 7 (the
+compatibility pass).
+
+**What the first Pi day found and fixed** (r26-26..32), each a rule from now on:
+- every launcher option must reach nxt: the game editor's `pcsx.cfg` keys were audited against the
+  config table - all the same, except upstream's versioned rename **`frameskip3` -> `frameskip4`**, read and
+  written as an alias now (`CE_INTVAL_N("frameskip3", ...)` ahead of it). Values are parsed as **hex**
+  (`strtoul(..., 16)`): the launcher writes 0/1 flags decimal and levels hex, both fine.
+- **`Config.SlowBoot` defaults to 1** (`emu_set_default_config`): upstream's 0 skips the BIOS logos, and the
+  launcher writes no line for "shown".
+- a pcsx-ab-era cfg says `plat_target.vout_fullscreen = 0`: on the console and the Pi the frontend forces
+  fullscreen (`check_fullscreen`) - it used to drop to a 1280x720 window inside 1080p and the pointer came
+  back. The pointer itself is hidden by relative mouse mode (KMSDRM ignores `SDL_ShowCursor`).
+- scanlines are drawn by the platform at output resolution (`plat_sdl2_set_scanlines`: one translucent
+  band per PSX row, `pl_vout_raw_h` lines; Scanlines 1-3 = thickness, brightness = what shows through), not
+  by darkening source rows - those were uneven at any non-integer scale and doubled by the 2x enhancement.
+  `pl_scanlines_by_plat` keeps plugin_lib's rows off. A C `bgr555_to_rgb565_b` exists for the builds
+  without NEON32 all the same.
+- `Config.PluginsDir` = `./plugins` when it exists, like `bios/` - the launch scripts put it next to `.pcsx`
+  (upstream's exe-relative dir was `/tmp/plugins`, empty).
+- the AutoBleem menu has Controller 1/2 (standard/analog/guns/none), Scanlines + brightness and Screen
+  (4:3 / 16:9 over `g_scaler`) - what pcsx-ab's Sony menu offered.
+- **debugging a display one cannot see**: `PLAT_SDL2_SHOT=/tmp/shot%d.bmp` saves the presented frame every
+  5 s (the emulator's own screenshot is the raw PSX frame); `AB_err.txt` has one line per video mode
+  (`video mode: 1024x480 (psx 512x240)`) and per loaded config (`autobleem: game config: filter=... boot
+  logo=... scanlines=...`), and the cursor calls. On the Pi: stop `autobleem.service`, run
+  `Autobleem/rc/launch.sh <ss> <cue> 2 4 <game> 0 <aspect> <filter> NA pcsx-abnxt` under `sudo` with the
+  env, then start the service again. `tools/win_drive.ps1 -AttachPid` drives an emulator started under gdb.
 
 | | |
 |---|---|
@@ -24,7 +52,7 @@ picker and phase 7 (the compatibility pass).
 | libpicofe | submodule `frontend/libpicofe` -> **`github.com/autobleem/libpicofe`** (our fork of notaz's), branch `develop`: r26's commit plus our SDL2 files (`plat_sdl2.*`, `in_sdl2.*`, `in_sdl2gc.*`); `upstream` remote there too. The other submodules (`deps/libchdr`, `lightrec`, `lightning`, `libretro-common`, `mman`, `frontend/warm`) are upstream's, untouched |
 | Build | `CMakeLists.txt`: upstream's `configure`/`Makefile` as CMake options (`PCSXAB_*`), the plugins, libchdr/lightrec/lightning/mman compiled from `deps/`; upstream's own build files stay untouched. `PCSXAB_PLATFORM=sdl2` (ours, the default), `sdl` (upstream's SDL 1.2 frontend, needs sdl12-compat on a PC) or `headless` |
 | Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** - Crash Bandicoot's intro in a 1280x720 window, Esc opens the menu, `tools/win_drive.ps1` drives it from a script (keys, screenshots, `-EmuArgs`, `close`) |
-| Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU, the SDL2 platform - **build, unrun** |
+| Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU, the SDL2 platform - **the 64-bit build runs on the Pi 400** (2026-09-20), 32-bit built, unrun |
 | PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`, SDL 2.0.12): builds and links, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - **unrun** (`build_psc/dist/` on the PC holds the last fetch); `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
 | Local checkout | `E:\Programming\pcsx-abnxt` |
 | Packages | `tools/make_packages.sh` -> `dist/packages/pcsx-abnxt-<git describe>-{psc,rpi-armhf,rpi-arm64}.tar.gz`, `-win64.zip` (from `build_win_rel`, a Release configure of the same tree) and a manifest json; published with autobleem-develop's `tools/repo_publish.sh pcsx <version> dist/packages/*` to **`https://autobleem.retromenele.pl/emu/pcsx-abnxt/`** (`latest.json`, the newest kept; first publish `r26-20-gb9801962`, 2026-09-20, marked a development build) |
