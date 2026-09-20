@@ -265,7 +265,8 @@ front buttons wait for the console. Phase 5's disc set and lid change came with 
     single-disc game says so; a change while the drive is busy says "not now". Verify: FF7 / MGS disc
     swaps on the console and the Pi; the launcher's `lastcdimg` slot round trip.
 
-**Phase 6 - the menu** (`feature/ab-menu`)
+**Phase 6 - the menu** (`feature/ab-menu`) - **done 2026-09-20** on Windows, with player 2's sticks; the
+memory-card and controller pages are upstream's as they are (under "PCSX menu").
 
 11. `ab_menu.c`: our main menu (11) with the upstream menu beneath it, Quick Save/Load, Toggle Filter
     (live), About text, "Save AutoBleem CFG"; the PS button / Select+Start entry; the memory-card and
