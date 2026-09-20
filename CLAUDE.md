@@ -10,25 +10,51 @@ change (commit messages are prose).
 
 ## State (2026-09-20)
 
-Phases 0 and 1 of `docs/port-plan.md` are done: the repositories exist and the CMake build produces the
-emulator for every target - upstream r26 untouched but for one portability helper.
+Phases 0-3 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the SDL2
+platform, and the launcher's contract (arguments, config, exit files). Next: phase 4 (the console's front
+buttons and the autosave ring), after the first runs on the Pi 400 and the console.
 
 | | |
 |---|---|
 | Repository | `github.com/autobleem/pcsx-abnxt`, a **public GitHub fork** of `notaz/pcsx_rearmed` (GPL-2; a fork of a public repo cannot be private - the owner's call, 2026-09-20) |
 | Base | upstream tag **`r26`** (2026-03-29, `56fef013`), the latest stable; `develop` starts there |
 | Branches | `master` mirrors upstream master (fast-forward only, never committed to); `develop` is ours; `feature/<slug>` off `develop`, merged `--no-ff` (gitflow, as in every AutoBleem repo); `upstream` remote = notaz |
-| libpicofe | submodule `frontend/libpicofe` -> **`github.com/autobleem/libpicofe`** (our fork of notaz's), branch `develop` at the commit r26 pins (`dd11f2d`), `upstream` remote there too. The other submodules (`deps/libchdr`, `lightrec`, `lightning`, `libretro-common`, `mman`, `frontend/warm`) are upstream's, untouched |
-| Build | `CMakeLists.txt` (phase 1, 2026-09-20): upstream's `configure`/`Makefile` as CMake options (`PCSXAB_*`), the plugins, libchdr/lightrec/lightning/mman compiled from `deps/`; upstream's own build files stay untouched |
-| Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** (Crash Bandicoot's intro renders, HLE BIOS) over upstream's SDL 1.2 frontend on sdl12-compat - use `plat_target.vout_method = 0` in `.pcsx/pcsx.cfg`, the overlay path is black there |
-| Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU - **link, headless** (no SDL 1.2 in any sysroot; the window comes with phase 2), unrun |
-| PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`): links **headless**, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - the phase-1 unknown settled; `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
+| libpicofe | submodule `frontend/libpicofe` -> **`github.com/autobleem/libpicofe`** (our fork of notaz's), branch `develop`: r26's commit plus our SDL2 files (`plat_sdl2.*`, `in_sdl2.*`, `in_sdl2gc.*`); `upstream` remote there too. The other submodules (`deps/libchdr`, `lightrec`, `lightning`, `libretro-common`, `mman`, `frontend/warm`) are upstream's, untouched |
+| Build | `CMakeLists.txt`: upstream's `configure`/`Makefile` as CMake options (`PCSXAB_*`), the plugins, libchdr/lightrec/lightning/mman compiled from `deps/`; upstream's own build files stay untouched. `PCSXAB_PLATFORM=sdl2` (ours, the default), `sdl` (upstream's SDL 1.2 frontend, needs sdl12-compat on a PC) or `headless` |
+| Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** - Crash Bandicoot's intro in a 1280x720 window, Esc opens the menu, `tools/win_drive.ps1` drives it from a script (keys, screenshots, `-EmuArgs`, `close`) |
+| Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU, the SDL2 platform - **build, unrun** |
+| PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`, SDL 2.0.12): builds and links, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - **unrun** (`build_psc/dist/` on the PC holds the last fetch); `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
 | Local checkout | `E:\Programming\pcsx-abnxt` |
 
-Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` gained `path_is_absolute()`
-for `C:\...` paths on Windows (two call sites) - a candidate for an upstream PR. Everything else Windows-
-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
+**The SDL2 platform** (`frontend/plat_sdl2.c` over libpicofe's `plat_sdl2`/`in_sdl2`/`in_sdl2gc`): one window
+and one accelerated renderer everywhere; the GPU plugin draws into a shadow RGB565 buffer that
+`plat_gvideo_flip()` uploads to a streaming texture and presents into the layer plugin_lib works out
+(`g_layer_*`; `plat_target.hwfilter` 0 = linear, 1 = nearest); the menu draws into a buffer the size of the
+window (the 2x font from 640x480 up). Fullscreen-desktop on the ARM targets, a resizable 1280x720 window on a
+PC (`plat_target.vout_fullscreen` / F11 toggles). Keys are SDL scancodes named in lower case ("escape", "f1",
+"eject", "reset"); pads are `sdl2gc:pad N` with fixed PlayStation button names, Select+Start = Home on a pad
+without a Guide button, player 1's sticks wired to `in_adev[]` at probe time. `PCSXAB_GLES` (libpicofe's own
+EGL output) is off on every target.
+
+**`frontend/ab/`** is ours. `ab_config`: the launch script's arguments taken out of argv (`ab_args_take`),
+`Bios = SET_BY_PCSX` -> `Config.Bios[US/EU] = romw.bin`, `[JP] = romJP.bin` (upstream picks by the disc's
+region, HLE without the file), `card2.mcd` -> `none`, `-filter`/`-ratio` -> hwfilter and `g_scaler`
+(`ab_config_loaded`, hooked at the end of `menu_load_config`). `ab_session`: the exit files
+(`ab_session_exit`, hooked after main()'s loop) - `sstates/<label>-<id>.000`, `screenshots/<label>-<id>.png`,
+`lastcdimg.txt`, and last `filename.txt`.
+
+Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`
+for `C:\` paths - a candidate for an upstream PR; the two `ab_*` hooks; `PCSX_MEMCARD_COUNT` instead of a
+fixed nine cards, 2 here), `frontend/main.h` (the macro's default), `frontend/menu.c` (the
+`ab_config_loaded` hook), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
+else Windows-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
 `win32_compat.h` force-included by CMake) and `NO_DYLIB` (upstream's own Windows recipe).
+
+**Known**: a save state loaded within the first seconds of a **HLE** boot (`-load 1` at start, or F2 at one
+second) leaves the game spinning in the HLE BIOS - with lightrec and with the interpreter alike; at 25 s the
+same state loads fine. Upstream's HLE keeps state outside RAM, so a state taken later cannot be put into a
+freshly booting HLE. The console and the Pi run real BIOS files, where this does not arise; a PC without one
+cannot test the resume path.
 
 ## What this is built from - read first
 
