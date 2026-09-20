@@ -239,7 +239,9 @@ resume load, which needs a real BIOS (see CLAUDE.md, "Known"): checked on the co
    Windows (the `usb/` tree): start, play, exit through the menu, the slot appears with its picture,
    resume from it, four slots, the "killed" case.
 
-**Phase 4 - the console's buttons and the ring** (`feature/console-buttons`)
+**Phase 4 - the console's buttons and the ring** (`feature/console-buttons`) - **done 2026-09-20** on Windows
+(Reset/Open on the F10/F9 binds, the ring, the raw state loading back); the power daemon and the real
+front buttons wait for the console. Phase 5's disc set and lid change came with it, without the picker.
 
 8. `ab_buttons.c`: `SACTION_CD_CHANGE`/`RESET_EVENT`/`POWER_OFF` and the key binds; `ab_console.c` (PSC
    only, a CMake option): the power daemon inotify thread, the temperature thread (2), `power_off_flg`

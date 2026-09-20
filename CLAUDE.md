@@ -10,9 +10,10 @@ change (commit messages are prose).
 
 ## State (2026-09-20)
 
-Phases 0-3 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the SDL2
-platform, and the launcher's contract (arguments, config, exit files). Next: phase 4 (the console's front
-buttons and the autosave ring), after the first runs on the Pi 400 and the console.
+Phases 0-4 of `docs/port-plan.md` are done: the repositories, the CMake build for every target, the SDL2
+platform, the launcher's contract (arguments, config, exit files), the front buttons with the autosave ring
+and the power daemon, and a first disc change (phase 5's core without its picker screen). All of it
+verified on Windows only; the first runs on the Pi 400 and the console are the next thing.
 
 | | |
 |---|---|
@@ -39,14 +40,28 @@ EGL output) is off on every target.
 **`frontend/ab/`** is ours. `ab_config`: the launch script's arguments taken out of argv (`ab_args_take`),
 `Bios = SET_BY_PCSX` -> `Config.Bios[US/EU] = romw.bin`, `[JP] = romJP.bin` (upstream picks by the disc's
 region, HLE without the file), `card2.mcd` -> `none`, `-filter`/`-ratio` -> hwfilter and `g_scaler`
-(`ab_config_loaded`, hooked at the end of `menu_load_config`). `ab_session`: the exit files
-(`ab_session_exit`, hooked after main()'s loop) - `sstates/<label>-<id>.000`, `screenshots/<label>-<id>.png`,
-`lastcdimg.txt`, and last `filename.txt`.
+(`ab_config_loaded`, hooked at the end of `menu_load_config`); stdout unbuffered. `ab_session`: the exit
+files (`ab_session_exit`, hooked after main()'s loop) - `sstates/<label>-<id>.000`,
+`screenshots/<label>-<id>.png`, `lastcdimg.txt`, and last `filename.txt`, named by the disc in the drive.
+`ab_buttons`: our emulator actions (`SACTION_AB_RESET` = "RESET button", `SACTION_AB_CD_CHANGE` = "CD
+Change button" - the pcsx.cfg bind names, on the `reset`/`eject` keys the console's front buttons send -
+`SACTION_AB_POWER_OFF`, `SACTION_AB_SNAPSHOT`), handled in `do_emu_action`'s default branch, and
+`ab_frame_tick()` from `pl_frame_limit`. **Rule**: anything that touches the emulator's state runs as an
+action, between CPU slices - `SaveState()` from inside a slice froze the game. `ab_autosave`: the ring
+(a memory `SaveState()` + the frame every 2 s, six kept, none in the first 10 s or near a memory-card
+write); Reset/Power leave the *oldest* one as the resume point, ~10 s back, written uncompressed (gzread
+takes it); the menu's Exit and the window's close leave the live state. `AB_NO_AUTOSAVE=1` turns it off.
+`ab_console`: the power daemon's `prepare_suspend` and `cpu_temp`/`temp_limit` watchers (inotify threads,
+Linux only, ending at once without the files). `ab_disc`: the disc set (multi-disc PBP, an `.m3u`, or the
+folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
+start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring.
 
 Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`
-for `C:\` paths - a candidate for an upstream PR; the two `ab_*` hooks; `PCSX_MEMCARD_COUNT` instead of a
-fixed nine cards, 2 here), `frontend/main.h` (the macro's default), `frontend/menu.c` (the
-`ab_config_loaded` hook), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
+for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
+default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
+default, our four `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
+names), `frontend/plugin_lib.c` (`ab_frame_tick()`), `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync
+in `SaveMcd`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
 else Windows-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
 `win32_compat.h` force-included by CMake) and `NO_DYLIB` (upstream's own Windows recipe).
 
