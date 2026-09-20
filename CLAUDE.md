@@ -33,6 +33,14 @@ compatibility pass).
   by darkening source rows - those were uneven at any non-integer scale and doubled by the 2x enhancement.
   `pl_scanlines_by_plat` keeps plugin_lib's rows off. A C `bgr555_to_rgb565_b` exists for the builds
   without NEON32 all the same.
+- **the filter is a post-processing scaler** (r26-36): Off = nearest, Linear = bilinear, Sharp = per-axis
+  whole-factor prescale into a render target + bilinear; the scanlines are drawn into that target at whole
+  rows (even at 480-line modes, where 1080p gives 2.25 px a row). `-filter 0/1/2`; the launcher's GFX
+  Filter sends 0/1. A game with `gpu_neon.enhancement_enable = 1` (Crash's PC-era cfg) is 2x before any
+  of this, which is why the owner saw no difference between Off and Linear on it.
+- SDL falls back to the **offscreen** driver when the DRM master is not free yet (the launcher's window,
+  or the previous emulator, for a few seconds): `plat_sdl2_init` retries video init for up to 6 s
+  instead of rendering into nothing.
 - `Config.PluginsDir` = `./plugins` when it exists, like `bios/` - the launch scripts put it next to `.pcsx`
   (upstream's exe-relative dir was `/tmp/plugins`, empty).
 - the AutoBleem menu has Controller 1/2 (standard/analog/guns/none), Scanlines + brightness and Screen
