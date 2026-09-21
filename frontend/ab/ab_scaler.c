@@ -2,10 +2,10 @@
  * pcsx-abnxt: the software smoothing scalers - scale2x, eagle2x (libpicofe's NEON code on 32-bit ARM,
  * plain C elsewhere), hq2x and hq3x (frontend/ab/hqx, LGPL) - applied to the PSX frame in plugin_lib's
  * blit, before the platform scales the result to the screen with the hardware filter. The frame comes
- * from VRAM as BGR555; the scalers want their input in the output's format (the NEON ones copy pixels
- * as they are, hqx's tables are indexed by RGB565), so it is converted first into a scratch buffer -
- * bgr555_to_rgb565 is NEON on the console - and scaled from there. A 2D game drawn at 320x240 or
- * 320x480 is what this is for; the menu's row is off by default, none of it runs then.
+ * from VRAM as BGR555. The NEON scalers convert it themselves (built with DO_BGR_TO_RGB, as upstream's
+ * Makefile builds them) and read VRAM directly; the C scalers and hqx (whose tables are indexed by
+ * RGB565) get it converted first into a scratch buffer. A 2D game drawn at 320x240 or 320x480 is what
+ * this is for; the menu's row is off by default, none of it runs then.
  *
  * (C) AutoBleem team, 2026 - GPL v2 or later, as the frontend.
  */
@@ -128,23 +128,27 @@ int ab_soft_blit(int filter, const void *vram, int sstride, void *dst, int dstri
 		last_h = h;
 		last_filter = filter;
 	}
+#ifdef HAVE_NEON32
+	// the NEON scalers are built with DO_BGR_TO_RGB (as upstream's Makefile builds them): they convert
+	// VRAM's BGR555 themselves, so they read it directly
+	if (filter == SOFT_FILTER_SCALE2X) {
+		neon_scale2x_16_16(vram, dst, w, sstride, dstride, h);
+		return 1;
+	}
+	if (filter == SOFT_FILTER_EAGLE2X) {
+		neon_eagle2x_16_16(vram, dst, w, sstride, dstride, h);
+		return 1;
+	}
+#endif
 	for (y = 0; y < h; y++)
 		bgr555_to_rgb565(scratch + (size_t)y * w, (const uint8_t *)vram + (size_t)y * sstride, w);
 
 	switch (filter) {
 	case SOFT_FILTER_SCALE2X:
-#ifdef HAVE_NEON32
-		neon_scale2x_16_16(scratch, dst, w, w * 2, dstride, h);
-#else
 		scale2x_16_16_c(scratch, dst, w, w * 2, dstride, h);
-#endif
 		break;
 	case SOFT_FILTER_EAGLE2X:
-#ifdef HAVE_NEON32
-		neon_eagle2x_16_16(scratch, dst, w, w * 2, dstride, h);
-#else
 		eagle2x_16_16_c(scratch, dst, w, w * 2, dstride, h);
-#endif
 		break;
 	case SOFT_FILTER_HQ2X:
 		hqx_init();
