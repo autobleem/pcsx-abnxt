@@ -232,9 +232,18 @@ cannot test the resume path.
 - **Re-implement, do not re-apply.** The old delta is 2017-core patching; upstream r26 already has CD lid
   emulation, `SlowBoot`, the fast boot, KSEG1 decoding, CHD, an aarch64 dynarec, lightrec, a C-SIMD NEON GPU
   and a per-serial hack database. Each feature is written again against what upstream has now.
-- **Per-title hacks are not ported** (131 serials, `isTitleName()` at 460 sites). Phase 7 tests the titles;
+- **Per-title hacks are not ported** (131 serials, `isTitleName()` at 463 sites). Phase 7 tests the titles;
   a reproduced regression gets a `libpcsxcore/database.c` entry (or a `Config.hacks` flag), never an
-  `isTitleName()` in the core.
+  `isTitleName()` in the core. **Except their configuration layer, behind a switch** (2026-09-21): Sony's
+  `config_change()` (136 of the sites, `frontend/menu.c` in the fork) applied SPU interpolation 2/3, SPU
+  thread off, interlace off, NTSC, a P.E.Op.S. swap with Sony-only flags and `iTempo` over pcsx.cfg at
+  every start, keyed on the **ISO file name** (`setCdromId()` overwrote `CdromId` with it - the console's
+  files were serials, a USB game's name is not). `frontend/ab/ab_hacks.c` has the four overrides that
+  exist upstream, keyed on the **disc's real `CdromId`**, in a table `tools/gen_sony_hacks.py` generates
+  from the reference patch (`ab_hacks_table.h`, 66 serials; the peops/`iTempo` ones listed in its header,
+  not ported), applied in `ab_config_loaded(1)` **only with `-sonyhacks`** and logged per override
+  (`autobleem: sony hack SLUS00708 (...): spu interpolation gaussian`). A lever for the compatibility
+  pass - most of it is probably obsolete against upstream's SPU and region detection - not a default.
 - **Layout rule**: our behaviour lives in new files - `frontend/ab/` and `frontend/plat_sdl2.c` (+ libpicofe's
   SDL2 files in our fork) - and upstream files get hooks only: a call, an enum value, a config entry. No
   `#ifdef PSC` in `cdrom.c`. A platform difference is a runtime check or a CMake option, never a second copy

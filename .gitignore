@@ -40,6 +40,7 @@ psx_gpu_offsets_update
 !/tools/win_drive.ps1
 !/tools/make_packages.sh
 !/tools/vendor_hqx.py
+!/tools/gen_sony_hacks.py
 
 /dist/
 /build_win_rel/

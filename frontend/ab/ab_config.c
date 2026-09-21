@@ -16,6 +16,7 @@
 #include "../menu.h"
 #include "../main.h"
 #include "ab_config.h"
+#include "ab_hacks.h"
 
 /* the BIOS files AutoBleem keeps in System/Bios (the launcher's launch.sh links it as bios/) */
 #define AB_BIOS_WORLD "romw.bin"
@@ -132,6 +133,7 @@ int ab_args_take(int argc, char *argv[])
 		    || take_int("-display", &ab_opts.display, 0, 1, argc, argv, &i)
 		    || take_str("-language", ab_opts.language, sizeof(ab_opts.language), argc, argv, &i)
 		    || take_flag("-fullscreen", &ab_opts.fullscreen, argv, &i)
+		    || take_flag("-sonyhacks", &ab_opts.sonyhacks, argv, &i)
 		    || take_string("-dotdir", &ab_opts.dotdir, argc, argv, &i)
 		    || take_string("-biosdir", &ab_opts.biosdir, argc, argv, &i))
 			continue;
@@ -146,9 +148,9 @@ int ab_args_take(int argc, char *argv[])
 			d[--n] = 0;
 		ab_opts.dotdir = d;
 	}
-	printf("autobleem: filter=%d ratio=%d lang=%d region=%d language=%s fullscreen=%d dotdir=%s biosdir=%s\n",
+	printf("autobleem: filter=%d ratio=%d lang=%d region=%d language=%s fullscreen=%d sonyhacks=%d dotdir=%s biosdir=%s\n",
 		ab_opts.filter, ab_opts.ratio, ab_opts.lang, ab_opts.region, ab_opts.language, ab_opts.fullscreen,
-		ab_opts.dotdir ? ab_opts.dotdir : "-", ab_opts.biosdir ? ab_opts.biosdir : "-");
+		ab_opts.sonyhacks, ab_opts.dotdir ? ab_opts.dotdir : "-", ab_opts.biosdir ? ab_opts.biosdir : "-");
 	return out;
 }
 
@@ -174,4 +176,6 @@ void ab_config_loaded(int is_game)
 		is_game ? "game" : "global",
 		plat_target.hwfilters != NULL ? plat_target.hwfilters[plat_target.hwfilter] : "-",
 		ab_opts.ratio ? "16:9" : "4:3", Config.SlowBoot ? "shown" : "skipped", scanlines);
+	if (is_game)
+		ab_hacks_apply();	/* -sonyhacks: Sony's overrides for this serial, over the file (ab_hacks.h) */
 }

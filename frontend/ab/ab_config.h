@@ -12,6 +12,8 @@
  *   -biosdir DIR   the BIOS folder (bios/ in the working directory otherwise)
  *   -fullscreen    the whole display, whatever a pcsx.cfg's vout_fullscreen says (a desktop build
  *                  opens a window by default; the console and the Pi are full screen regardless)
+ *   -sonyhacks     Sony's per-title configuration overrides for the disc's serial, over the pcsx.cfg
+ *                  (ab_hacks.h; off by default - a lever for the compatibility pass)
  *
  * (C) AutoBleem team, 2026
  *
@@ -33,6 +35,7 @@ struct ab_options {
 	 * only pcsx-abnxt gets it - the launch scripts keep it from the classic pcsx-ab */
 	char language[64];
 	int fullscreen;	/* -fullscreen: the display is ours, no window */
+	int sonyhacks;	/* -sonyhacks: Sony's per-title configuration overrides by serial (ab_hacks.h) */
 	const char *dotdir;	/* -dotdir: the profile folder, NULL = <home>/.pcsx as upstream has it */
 	const char *biosdir;	/* -biosdir: the BIOS folder, NULL = the profile's bios/ (or ./bios) */
 };

@@ -430,7 +430,7 @@ OBJS += frontend/libpicofe/plat_sdl2.o frontend/libpicofe/in_sdl2.o frontend/lib
 OBJS += frontend/libpicofe/plat_dummy.o
 OBJS += frontend/plat_sdl2.o
 OBJS += frontend/ab/ab_config.o frontend/ab/ab_session.o frontend/ab/ab_buttons.o frontend/ab/ab_autosave.o
-OBJS += frontend/ab/ab_console.o frontend/ab/ab_disc.o frontend/ab/ab_ui.o
+OBJS += frontend/ab/ab_console.o frontend/ab/ab_disc.o frontend/ab/ab_ui.o frontend/ab/ab_hacks.o
 frontend/menu.o: CFLAGS += -DSDL_OVERLAY_2X -DMENU_SHOW_VARSCALER=1
 frontend/ab/ab_ui.o: CFLAGS += -Wno-unused-function
 USE_PLUGIN_LIB = 1
