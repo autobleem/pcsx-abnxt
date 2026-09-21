@@ -423,6 +423,19 @@ frontend/main.o frontend/menu.o: CFLAGS += -include frontend/320240/ui_miyoo.h
 USE_PLUGIN_LIB = 1
 USE_FRONTEND = 1
 endif
+ifeq "$(PLATFORM)" "psclassic"
+# AutoBleem's port for Sony's PlayStation Classic (and its Raspberry Pi / PC targets): the SDL2 platform
+# and the launcher's contract in frontend/ab/, over libpicofe's SDL2 backend
+OBJS += frontend/libpicofe/plat_sdl2.o frontend/libpicofe/in_sdl2.o frontend/libpicofe/in_sdl2gc.o
+OBJS += frontend/libpicofe/plat_dummy.o
+OBJS += frontend/plat_sdl2.o
+OBJS += frontend/ab/ab_config.o frontend/ab/ab_session.o frontend/ab/ab_buttons.o frontend/ab/ab_autosave.o
+OBJS += frontend/ab/ab_console.o frontend/ab/ab_disc.o frontend/ab/ab_ui.o
+frontend/menu.o: CFLAGS += -DSDL_OVERLAY_2X -DMENU_SHOW_VARSCALER=1
+frontend/ab/ab_ui.o: CFLAGS += -Wno-unused-function
+USE_PLUGIN_LIB = 1
+USE_FRONTEND = 1
+endif
 ifeq "$(PLATFORM)" "maemo"
 OBJS += maemo/hildon.o maemo/main.o maemo/maemo_xkb.o frontend/pl_gun_ts.o
 USE_PLUGIN_LIB = 1
@@ -481,6 +494,9 @@ OBJS += frontend/libpicofe/arm/neon_eagle2x.o
 frontend/libpicofe/arm/neon_scale2x.o: CFLAGS += -DDO_BGR_TO_RGB
 frontend/libpicofe/arm/neon_eagle2x.o: CFLAGS += -DDO_BGR_TO_RGB
 endif
+# the software filter on every platform: scale2x/eagle2x in C where there is no NEON, hq2x/hq3x (hqx, LGPL)
+OBJS += frontend/ab/ab_scaler.o frontend/ab/hqx/hqx_init.o frontend/ab/hqx/hq2x.o frontend/ab/hqx/hq3x.o
+frontend/ab/hqx/hq2x.o frontend/ab/hqx/hq3x.o: CFLAGS += -O3 -w
 endif
 ifeq "$(USE_FRONTEND)" "1"
 OBJS += frontend/menu.o

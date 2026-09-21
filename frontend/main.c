@@ -34,9 +34,11 @@
 #include "../plugins/dfsound/spu_config.h"
 #include "arm_features.h"
 #include "revision.h"
+#ifdef PSCLASSIC
 #include "ab/ab_config.h"
 #include "ab/ab_session.h"
 #include "ab/ab_buttons.h"
+#endif
 
 #if defined(__EMSCRIPTEN__)
 #define DO_CPU_CHECKS 0
@@ -112,12 +114,14 @@ static void set_default_paths(void)
 	// prefer bios in working dir for compatibility
 	if (!strcmp(home, ".") && !stat("bios", &st))
 		strcpy(Config.BiosDir, "bios");
+#ifdef PSCLASSIC
 	// AutoBleem's -biosdir names it outright
 	if (ab_opts.biosdir != NULL)
 		snprintf(Config.BiosDir, sizeof(Config.BiosDir), "%s", ab_opts.biosdir);
 	// AutoBleem's launch scripts put plugins/ next to .pcsx/ and bios/ in the working dir as well
 	if (!strcmp(home, ".") && !stat("plugins", &st))
 		strcpy(Config.PluginsDir, "plugins");
+#endif
 
 	SysPrintf("dirs: profile=%s" PCSX_DOT_DIR ", bios=%s, plugins=%s\n",
 		home, Config.BiosDir, Config.PluginsDir);
@@ -137,10 +141,12 @@ void emu_set_default_config(void)
 	Config.GpuListWalking = -1;
 	Config.FractionalFramerate = -1;
 	Config.AlternativeFlip = -1;
+#ifdef PSCLASSIC
 	// AutoBleem: the BIOS shell and its logos run unless the game's pcsx.cfg says "SlowBoot = 0" - the
 	// console's emulator always did, and the launcher's "Boot logo" option writes no line for "shown"
 	// (upstream's default is 0, straight into the game)
 	Config.SlowBoot = 1;
+#endif
 
 	pl_rearmed_cbs.dithering = 1;
 	pl_rearmed_cbs.gpu_neon.allow_interlace = 2; // auto
@@ -303,7 +309,9 @@ do_state_slot:
 		snprintf(hud_msg, sizeof(hud_msg), "ANALOG %s", ret ? "ON" : "OFF");
 		break;
 	default:
+#ifdef PSCLASSIC
 		ab_emu_action(emu_action);
+#endif
 		return;
 	}
 
@@ -546,8 +554,16 @@ static const char *get_home_dir(void)
 
 void emu_make_path(char *buf, size_t size, const char *dir, const char *fname)
 {
+#ifdef PSCLASSIC
 	// AutoBleem's -dotdir puts the profile wherever the launcher says (ab_config.c)
 	ab_make_path(buf, size, get_home_dir(), dir, fname);
+#else
+	const char *home = get_home_dir();
+	if (fname)
+		snprintf(buf, size, "%s%s%s", home, dir, fname);
+	else
+		snprintf(buf, size, "%s%s", home, dir);
+#endif
 }
 
 void emu_make_data_path(char *buff, const char *end, int size)
@@ -614,8 +630,10 @@ int main(int argc, char *argv[])
 	int loadst = 0;
 	int i;
 
+#ifdef PSCLASSIC
 	// AutoBleem's options first: -dotdir/-biosdir must be known when preinit lays the default paths out
 	argc = ab_args_take(argc, argv);
+#endif
 	emu_core_preinit();
 
 	// read command line options
@@ -753,7 +771,9 @@ int main(int argc, char *argv[])
 			do_emu_action();
 	}
 
+#ifdef PSCLASSIC
 	ab_session_exit();
+#endif
 	printf("Exit..\n");
 	ClosePlugins();
 	SysClose();
@@ -817,12 +837,16 @@ static int get_gameid_filename(char *buf, int size, const char *fmt, int i) {
 		else
 			continue;
 
+#ifdef PSCLASSIC
 	{
 		// AutoBleem's -dotdir: fmt is "%s" PCSX_DOT_DIR "<sub>/<name>" - the profile part rewritten
 		char fmt2[MAXPATHLEN];
 		const char *home = ab_gameid_format(fmt, fmt2, sizeof(fmt2), get_home_dir());
 		snprintf(buf, size, fmt2, home, trimlabel, CdromId, i);
 	}
+#else
+	snprintf(buf, size, fmt, get_home_dir(), trimlabel, CdromId, i);
+#endif
 
 	return 0;
 }

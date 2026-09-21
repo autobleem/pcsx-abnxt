@@ -132,6 +132,10 @@ add_compile_options(-Wall -ffast-math -ffunction-sections -fdata-sections -Wno-u
 add_compile_definitions(_REENTRANT _FILE_OFFSET_BITS=64 DISABLE_MEM_LUTS=0)
 # AutoBleem's memory-card sets are one card, swapped in as card1.mcd; card2 stays for a second player's
 add_compile_definitions(PCSX_MEMCARD_COUNT=2)
+# our hooks in upstream's files are gated the way its ports are (-DPANDORA, -DMAEMO): PSCLASSIC is the
+# platform name upstream's configure/Makefile know us by (./configure --platform=psclassic builds the
+# same emulator); without it the tree is upstream's
+add_compile_definitions(PSCLASSIC)
 if (WIN32)
     # deps/mman is mmap() for MinGW; the CRT has no posix_memalign
     # NO_DYLIB is upstream's own Windows recipe (Makefile.libretro): the plugins are built in and

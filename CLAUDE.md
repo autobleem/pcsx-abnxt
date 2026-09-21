@@ -239,6 +239,20 @@ cannot test the resume path.
   SDL2 files in our fork) - and upstream files get hooks only: a call, an enum value, a config entry. No
   `#ifdef PSC` in `cdrom.c`. A platform difference is a runtime check or a CMake option, never a second copy
   of a file. This is what keeps `git merge upstream/master` cheap; merge at upstream release tags.
+- **We are a platform of upstream's, `psclassic`** (2026-09-21, the owner's ask, a dry run that held): the
+  hooks in upstream files that are AutoBleem's own (the launch arguments, the exit files, the actions, the
+  autosave's memcard hook, our menu, `-dotdir`'s paths) sit under **`#ifdef PSCLASSIC`**, the way notaz's
+  ports sit under `PANDORA`/`MAEMO`; what is a fix or a feature for everyone (`path_is_absolute`,
+  `PCSX_MEMCARD_COUNT` with its default of 9, the soft filter on every platform, the 4:3 layer rule, player
+  2's analogs, `pl_scanlines_by_plat`) stays unconditional - those are the PR candidates. **A new hook goes
+  under the ifdef unless it is meant for everyone.** Upstream's own build knows us: `./configure
+  --platform=psclassic` (SDL2 through `sdl2-config`/`SDL2_CONFIG`, `-DPSCLASSIC -DPCSX_MEMCARD_COUNT=2`) and
+  the `Makefile`'s `psclassic` block (our platform and `frontend/ab/` objects; the soft filter's objects are
+  in the common plugin_lib block) build the same emulator as our CMake, which defines `PSCLASSIC` itself.
+  Verified: `--platform=generic` links upstream's `pcsx` with nothing of ours but the soft filter, and
+  `--platform=psclassic` with the console toolchain links our emulator (same libraries as the CMake one).
+  The libpicofe fork needs no gating: six new files, no line of notaz's changed. The CMake build stays the
+  one the scripts and CI use; the Makefile path is the shape a future PR to notaz would take.
 - **Video**: one SDL2 platform everywhere - window + `SDL_GL_CreateContext` (Wayland on the console, KMSDRM
   on the Pi, WGL on Windows) into libpicofe's `gl.c`, SDL_Renderer as the fallback. No hand-written Wayland
   code (Sony's `gl_platform.c` is in the reference patch if the PowerVR ever needs it back).

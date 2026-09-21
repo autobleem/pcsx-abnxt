@@ -28,7 +28,9 @@
 #include "main.h"
 #include "plat.h"
 #include "pcnt.h"
+#ifdef PSCLASSIC
 #include "ab/ab_buttons.h"
+#endif
 #include "ab/ab_scaler.h"
 #include "pl_gun_ts.h"
 #include "cspace.h"
@@ -720,7 +722,10 @@ static void update_input(void)
 			;
 		emu_act = which;
 	}
-	emu_set_action(ab_filter_action(emu_act));
+#ifdef PSCLASSIC
+	emu_act = ab_filter_action(emu_act);	/* the menu button's hold is Reset off the console */
+#endif
+	emu_set_action(emu_act);
 
 	in_keystate[0] = actions[IN_BINDTYPE_PLAYER12] & 0xffff;
 	in_keystate[1] = (actions[IN_BINDTYPE_PLAYER12] >> 16) & 0xffff;
@@ -788,7 +793,9 @@ void pl_frame_limit(void)
 	/* doing input here because the pad is polled
 	 * thousands of times per frame for some reason */
 	update_input();
+#ifdef PSCLASSIC
 	ab_frame_tick();
+#endif
 
 	pcnt_end(PCNT_ALL);
 	gettimeofday(&now, 0);

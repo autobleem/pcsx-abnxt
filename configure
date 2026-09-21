@@ -37,7 +37,7 @@ check_define_val()
 # setting options to "yes" or "no" will make that choice default,
 # "" means "autodetect".
 
-platform_list="generic pandora maemo caanoo miyoo"
+platform_list="generic pandora maemo caanoo miyoo psclassic"
 platform="generic"
 builtin_gpu_list="neon peops unai"
 dynarec_list="ari64 lightrec none"
@@ -62,6 +62,7 @@ gnu_linker="yes"
 dynarec=""
 multithreading="yes"
 need_sdl="no"
+need_sdl2="no"
 need_xlib="no"
 need_libpicofe="yes"
 need_warm="no"
@@ -151,6 +152,11 @@ set_platform()
     optimize_arm926ej="yes"
     need_warm="yes"
     multithreading="no"
+    ;;
+  psclassic)
+    # Sony's PlayStation Classic (Cortex-A35, Weston) and AutoBleem's other targets (Raspberry Pi, a PC):
+    # one SDL2 platform (frontend/plat_sdl2.c); the GPU and the dynarec follow the architecture
+    sound_drivers="sdl"
     ;;
   *)
     fail "unsupported platform: $platform"
@@ -378,6 +384,10 @@ miyoo)
   need_sdl="yes"
   CFLAGS="$CFLAGS -DMIYOO"
   ;;
+psclassic)
+  need_sdl2="yes"
+  CFLAGS="$CFLAGS -DPSCLASSIC -DPCSX_MEMCARD_COUNT=2"
+  ;;
 esac
 
 # header/library presence tests
@@ -496,6 +506,16 @@ if [ "$need_sdl" = "yes" ]; then
   CFLAGS="$CFLAGS `${SDL_CONFIG} --cflags`"
   MAIN_LDLIBS="`${SDL_CONFIG} --libs` $MAIN_LDLIBS"
   check_sdl || fail "please install libsdl (libsdl1.2-dev)"
+fi
+
+if [ "$need_sdl2" = "yes" ]; then
+  # sdl2-config from the sysroot, or SDL2_CONFIG in the environment (a cross build's, say)
+  [ "x${SDL2_CONFIG}" = "x" ] && SDL2_CONFIG="${SYSROOT}/usr/bin/sdl2-config"
+  which ${SDL2_CONFIG} > /dev/null || \
+    fail "sdl2-config is missing; please install libsdl2 (libsdl2-dev)"
+  CFLAGS="$CFLAGS `${SDL2_CONFIG} --cflags`"
+  MAIN_LDLIBS="`${SDL2_CONFIG} --libs` $MAIN_LDLIBS"
+  check_sdl || fail "please install libsdl2 (libsdl2-dev)"
 fi
 
 # check for tslib (only headers needed)
