@@ -89,16 +89,21 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
 - a pcsx-ab-era cfg says `plat_target.vout_fullscreen = 0`: on the console and the Pi the frontend forces
   fullscreen (`check_fullscreen`) - it used to drop to a 1280x720 window inside 1080p and the pointer came
   back. The pointer itself is hidden by relative mouse mode (KMSDRM ignores `SDL_ShowCursor`).
-- scanlines are drawn by the platform at output resolution (`plat_sdl2_set_scanlines`: one translucent
-  band per PSX row, `pl_vout_raw_h` lines; Scanlines 1-3 = thickness, brightness = what shows through), not
-  by darkening source rows - those were uneven at any non-integer scale and doubled by the 2x enhancement.
-  `pl_scanlines_by_plat` keeps plugin_lib's rows off. A C `bgr555_to_rgb565_b` exists for the builds
-  without NEON32 all the same.
-- **the filter is a post-processing scaler** (r26-36): Off = nearest, Linear = bilinear, Sharp = per-axis
-  whole-factor prescale into a render target + bilinear; the scanlines are drawn into that target at whole
-  rows (even at 480-line modes, where 1080p gives 2.25 px a row). `-filter 0/1/2`; the launcher's GFX
-  Filter sends 0/1. A game with `gpu_neon.enhancement_enable = 1` (Crash's PC-era cfg) is 2x before any
-  of this, which is why the owner saw no difference between Off and Linear on it.
+- **the frame's way to the screen** (libpicofe `plat_sdl2_present`, the owner's pcsx-ab chain redone on
+  the GPU, 2026-09-21 after the console showed the first version's uneven scanlines): the RGB565 frame is
+  scaled **once** into the backbuffer with the filter (`-filter 0/1/2`: Off = nearest, Linear = bilinear,
+  Sharp = whole-multiple prescale in a native 8888 render target then bilinear for the remainder - at 720p
+  a 240-line game's Sharp equals Off, inherent), and the **scanlines go over the scaled picture**, never
+  scaled again: a property of the screen like a CRT's, 240 lines over the picture's height whatever the
+  game's mode (3 px each at 720p, 4/5 alternating at 1080p), one ARGB overlay texture made on the CPU when
+  size/thickness/level change and blended in one copy (Scanlines 1-3 = thickness/4 of a line, at least 1 px,
+  a pixel of picture kept - 1/2/2 px at 720p; brightness = what shows through). Not fill rects: SDL 2.0.12's
+  GLES2 drew those 1 px high whatever was asked. The menu never has them (`dst == NULL`), FMV does.
+  `pl_scanlines_by_plat` keeps plugin_lib's own row-darkening off (a C `bgr555_to_rgb565_b` exists for the
+  builds without NEON32 all the same). The launcher's GFX Filter sends 0/1. A game with
+  `gpu_neon.enhancement_enable = 1` (Crash's PC-era cfg) is 2x before any of this, which is why the owner
+  saw no difference between Off and Linear on it. What is outside the picture (a 4:3 game's side bands) is
+  the backbuffer, free for anything drawn before the present.
 - SDL falls back to the **offscreen** driver when the DRM master is not free yet (the launcher's window,
   or the previous emulator, for a few seconds): `plat_sdl2_init` retries video init for up to 6 s
   instead of rendering into nothing.

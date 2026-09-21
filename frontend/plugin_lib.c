@@ -62,7 +62,7 @@ void *pl_vout_buf;
 int g_layer_x, g_layer_y, g_layer_w, g_layer_h;
 static int pl_vout_w, pl_vout_h, pl_vout_bpp; /* output display/layer */
 static int pl_vout_scale_w, pl_vout_scale_h;
-int pl_vout_raw_h, pl_scanlines_by_plat;
+int pl_scanlines_by_plat;
 static int psx_w, psx_h, psx_bpp;
 static int vsync_cnt;
 static int is_pal, frame_interval, frame_interval1024;
@@ -281,7 +281,6 @@ static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
 	psx_w = raw_w;
 	psx_h = raw_h;
 	psx_bpp = bpp;
-	pl_vout_raw_h = raw_h;
 	fprintf(stderr, "video mode: %dx%d (psx %dx%d) %d bpp\n", w, h, raw_w, raw_h, bpp);
 	vout_w = w;
 	vout_h = h;
