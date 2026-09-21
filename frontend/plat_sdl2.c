@@ -226,9 +226,9 @@ void plat_init(void)
     exit(1);
   plat_target.vout_fullscreen = fullscreen_old = plat_sdl2_is_fullscreen();
 
-  // alloc enough for double res. rendering
-  shadow_fb = calloc(1024 * 512, 2);
-  menubg_img = calloc(1024 * 512, 2);
+  // enough for the largest frame plugin_lib lets through: 2x-enhanced, or scaled by the smoothing
+  shadow_fb = calloc(PL_VOUT_MAX_W * PL_VOUT_MAX_H, 2);
+  menubg_img = calloc(PL_VOUT_MAX_W * PL_VOUT_MAX_H, 2);
   if (shadow_fb == NULL || menubg_img == NULL) {
     fprintf(stderr, "OOM\n");
     exit(1);

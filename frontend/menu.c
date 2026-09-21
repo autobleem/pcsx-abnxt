@@ -1313,9 +1313,7 @@ static const char *men_scaler[] = {
 	NULL
 };
 static const char *men_soft_filter[] = { "None",
-#ifdef HAVE_NEON32
-	"scale2x", "eagle2x",
-#endif
+	"scale2x", "eagle2x", "hq2x", "hq3x",	/* ab/ab_scaler.c: on every platform */
 	NULL };
 static const char *men_dummy[] = { NULL };
 static const char *men_centering[] = { "Auto", "Ingame", "Borderless", "Force", NULL };

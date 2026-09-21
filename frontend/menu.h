@@ -32,6 +32,8 @@ enum g_soft_filter_opts {
 	SOFT_FILTER_NONE,
 	SOFT_FILTER_SCALE2X,
 	SOFT_FILTER_EAGLE2X,
+	SOFT_FILTER_HQ2X,	/* ab/ab_scaler.c */
+	SOFT_FILTER_HQ3X,
 };
 
 extern int g_opts, g_scaler, g_gamma;

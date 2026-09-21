@@ -104,6 +104,19 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
   `gpu_neon.enhancement_enable = 1` (Crash's PC-era cfg) is 2x before any of this, which is why the owner
   saw no difference between Off and Linear on it. What is outside the picture (a 4:3 game's side bands) is
   the backbuffer, free for anything drawn before the present.
+- **Smoothing** (the menu row under Filter; upstream's `soft_filter`, `pcsx.cfg` 0-4, also the PCSX menu's
+  "Software Filter"): None / Scale2x / Eagle2x / HQ2x / HQ3x, `frontend/ab/ab_scaler.c` hooked into
+  `plugin_lib.c`'s blit - the BGR555 frame converted to RGB565 (NEON on 32-bit ARM) into a scratch buffer,
+  scaled 2x/3x into the frame buffer, then the chain above. Scale2x/Eagle2x are libpicofe's NEON asm on
+  32-bit ARM and C in `ab_scaler.c` elsewhere; HQ2x/HQ3x are grom358's **hqx** (LGPL 2.1, vendored in
+  `frontend/ab/hqx/`, generated for RGB565 in and out by a script - the pattern switches verbatim, the driver
+  loops and the 16M-entry RGB->YUV table replaced by two 64K tables; regenerate rather than patch). The
+  scaled frame must fit `PL_VOUT_MAX_W/H` = 1600x1024 (`plugin_lib.h`; the platform's frame buffers are
+  that size): 320x240 and 512x240 get all five, 320x480/640x480 the 2x ones, HQ3x there = "filter
+  unavailable" as upstream's message goes; 24-bit frames are never scaled. `pl_update_layer_size`'s 4:3 rule
+  reasons from the PSX line count (`h / pl_vout_scale_h`), or a 3x frame looked 480i to it. **On the console
+  HQ2x/HQ3x run at 30 fps** (the owner's call: left as is, off by default; a scaler thread on a spare core
+  is the follow-up if it ever matters); Scale2x/Eagle2x cost nothing visible. xBRZ was ruled out: GPL-3.
 - SDL falls back to the **offscreen** driver when the DRM master is not free yet (the launcher's window,
   or the previous emulator, for a few seconds): `plat_sdl2_init` retries video init for up to 6 s
   instead of rendering into nothing.
@@ -175,18 +188,23 @@ takes it); the menu's Exit and the window's close leave the live state. `AB_NO_A
 Linux only, ending at once without the files). `ab_disc`: the disc set (multi-disc PBP, an `.m3u`, or the
 folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
 start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring. `ab_menu.c`:
-the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Screen, Scanlines, the
-controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
+the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Smoothing, Screen, Scanlines,
+the controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
 `autobleem.cfg`, Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
-libpicofe's menu.c because the menu machinery is static there. Player 2's sticks:
-`in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
+libpicofe's menu.c because the menu machinery is static there. `ab_scaler.c` + `hqx/`: the smoothing
+scalers (see "Smoothing"; `tools/vendor_hqx.py` regenerates `hqx/hq2x.c`/`hq3x.c` from a clone of
+grom358/hqx). Player 2's sticks: `in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
 
 Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`
 for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
 default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
 default, our four `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
-names), `frontend/plugin_lib.c` (`ab_frame_tick()`; the analog tables at 4 and `update_analogs()` over both
-players), `frontend/plugin_lib.h` (the same tables), `frontend/menu.c` also `#include`s `ab/ab_menu.c` and
+names, `men_soft_filter`'s five names on every platform), `frontend/menu.h` (`SOFT_FILTER_HQ2X/HQ3X`),
+`frontend/plugin_lib.c` (`ab_frame_tick()`; the analog tables at 4 and `update_analogs()` over both
+players; `pl_scanlines_by_plat`; the smoothing: `ab_soft_scale_factor()` in `pl_vout_set_mode`,
+`ab_soft_blit()` in the flip in place of the `HAVE_NEON32` scalers, `resolution_ok()` against
+`PL_VOUT_MAX_*`, the 4:3 layer rule from the PSX line count), `frontend/plugin_lib.h` (the same tables,
+`pl_scanlines_by_plat`, `PL_VOUT_MAX_W/H`), `frontend/menu.c` also `#include`s `ab/ab_menu.c` and
 runs `ab_menu_loop_d()`, `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync in `SaveMcd`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
 else Windows-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
 `win32_compat.h` force-included by CMake) and `NO_DYLIB` (upstream's own Windows recipe).

@@ -48,6 +48,10 @@ static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, c
 static const char h_ab_savecfg[] = "Keeps today's settings for this game in AutoBleem";
 static const char h_ab_scanlines[] = "Dark lines between the picture's rows, 1-3 rows thick;"
                                      " brightness is how dark";
+/* upstream's soft_filter (the PCSX menu's "Software Filter"), with our hq2x/hq3x - ab_scaler.c */
+static const char *men_ab_smooth[] = { "None", "Scale2x", "Eagle2x", "HQ2x", "HQ3x", NULL };
+static const char h_ab_smooth[]  = "Smooths 2D games' pixels before scaling (CPU work: try HQ3x, drop to"
+                                   " Scale2x if the game slows down); low-resolution modes only";
 /* the picture's shape as the launcher's "Widescreen" option sets it (-ratio): 4:3 in the middle of the
  * screen, or the whole 16:9 screen; the PCSX menu's "Scaler" is the full set, this is the switch */
 static int ab_aspect_sel;
@@ -66,6 +70,7 @@ static menu_entry e_menu_ab[] =
 	mee_handler_id("Quick load",               MA_AB_QUICKLOAD,     ab_menu_handler),
 	mee_handler_id("Change disc",              MA_AB_DISC,          ab_menu_handler),
 	mee_cust_h    ("Filter",                   MA_AB_FILTER,        ab_menu_handler, ab_filter_name, h_ab_filter),
+	mee_enum_h    ("Smoothing",                MA_OPT_SWFILTER,     soft_filter, men_ab_smooth, h_ab_smooth),
 	mee_enum_h    ("Screen",                   0,                   ab_aspect_sel, men_ab_aspect, h_ab_aspect),
 	mee_enum_h    ("Scanlines",                MA_OPT_SCANLINES,    scanlines, men_scanlines, h_ab_scanlines),
 	mee_range_h   ("Scanline brightness",      MA_OPT_SCANLINE_LEVEL, scanline_level, 0, 100, h_scanline_l),

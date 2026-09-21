@@ -22,6 +22,10 @@ enum {
 extern int in_type[8];
 // a platform that draws the scanlines itself (over the scaled picture) sets this; the rows above stay
 extern int pl_scanlines_by_plat;
+// the largest frame the platform's buffer takes: a 512x240 frame at hq3x, or 640x480 doubled (the
+// 2x enhancement, scale2x) - the platform allocates its frame buffers to this
+#define PL_VOUT_MAX_W 1600
+#define PL_VOUT_MAX_H 1024
 extern int multitap1;
 extern int multitap2;
 extern int in_analog_left[8][2];

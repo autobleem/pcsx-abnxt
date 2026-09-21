@@ -233,7 +233,11 @@ set(PCSXAB_SOURCES
     # AutoBleem's own (the port's rule: new files, hooks only in upstream's)
     frontend/ab/ab_config.c frontend/ab/ab_session.c frontend/ab/ab_buttons.c frontend/ab/ab_autosave.c
     frontend/ab/ab_console.c frontend/ab/ab_disc.c frontend/ab/ab_ui.c
+    # the smoothing scalers: ours (scale2x/eagle2x in C) and hqx (LGPL, adapted to RGB565)
+    frontend/ab/ab_scaler.c frontend/ab/hqx/hqx_init.c frontend/ab/hqx/hq2x.c frontend/ab/hqx/hq3x.c
 )
+# the hqx sources are vendored code with their own style
+set_source_files_properties(frontend/ab/hqx/hq2x.c frontend/ab/hqx/hq3x.c PROPERTIES COMPILE_OPTIONS "-O3;-w")
 set_source_files_properties(frontend/libpicofe/input.c PROPERTIES COMPILE_OPTIONS -Wno-array-bounds)
 # stb_truetype (STBTT_STATIC) defines its whole API; we use a corner of it
 set_source_files_properties(frontend/ab/ab_ui.c PROPERTIES COMPILE_OPTIONS -Wno-unused-function)

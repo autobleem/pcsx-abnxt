@@ -29,6 +29,7 @@
 #include "plat.h"
 #include "pcnt.h"
 #include "ab/ab_buttons.h"
+#include "ab/ab_scaler.h"
 #include "pl_gun_ts.h"
 #include "cspace.h"
 #include "psemu_plugin_defs.h"
@@ -226,8 +227,10 @@ void pl_update_layer_size(int w, int h, int fw, int fh)
 #endif
 
 	case SCALE_4_3:
-		mult = 240.0f / (float)h * 4.0f / 3.0f;
-		if (h > 256)
+		// from the PSX line count, not the soft-scaled frame's (a 3x frame would look 480i to the rule below)
+		imult = pl_vout_scale_h > 1 ? pl_vout_scale_h : 1;
+		mult = 240.0f / (float)(h / imult) * 4.0f / 3.0f;
+		if (h / imult > 256)
 			mult *= 2.0f;
 		g_layer_w = mult * (float)fh;
 		g_layer_h = fh;
@@ -264,7 +267,7 @@ static const struct cspace_func_type {
 // XXX: this is platform specific really
 static inline int resolution_ok(int w, int h)
 {
-	return w <= 1024 && h <= 512;
+	return w <= PL_VOUT_MAX_W && h <= PL_VOUT_MAX_H;
 }
 
 static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
@@ -309,11 +312,11 @@ static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
 	assert(vout_h >= 192);
 
 	pl_vout_scale_w = pl_vout_scale_h = 1;
-#ifdef HAVE_NEON32
 	if (soft_filter) {
-		if (resolution_ok(w * 2, h * 2) && bpp == 16) {
-			pl_vout_scale_w = 2;
-			pl_vout_scale_h = 2;
+		int k = ab_soft_scale_factor(soft_filter);	// ab/ab_scaler.c: 2x or 3x, on every platform
+		if (k > 1 && resolution_ok(w * k, h * k) && bpp == 16) {
+			pl_vout_scale_w = k;
+			pl_vout_scale_h = k;
 		}
 		else {
 			// filter unavailable
@@ -321,7 +324,6 @@ static void pl_vout_set_mode(int w, int h, int raw_w, int raw_h, int bpp)
 		}
 	}
 	else
-#endif
 	if (!pl_scanlines_by_plat && scanlines != 0 && scanline_level != 100 && bpp == 16) {
 		if (h <= 256)
 			pl_vout_scale_h = 2;
@@ -453,18 +455,11 @@ static void pl_vout_flip(const void *vram_, int vram_ofs, int bgr24,
 			}
 		}
 	}
-#ifdef HAVE_NEON32
-	else if (soft_filter == SOFT_FILTER_SCALE2X && pl_vout_scale_w == 2)
+	else if (soft_filter && pl_vout_scale_w > 1
+		 && ab_soft_blit(soft_filter, vram + vram_ofs, 2048, dest, dstride * 2, w, h))
 	{
-		neon_scale2x_16_16((const void *)(vram + vram_ofs), (void *)dest, w,
-			2048, dstride * 2, h);
+		// ab/ab_scaler.c scaled the frame by pl_vout_scale_w (scale2x/eagle2x/hq2x/hq3x)
 	}
-	else if (soft_filter == SOFT_FILTER_EAGLE2X && pl_vout_scale_w == 2)
-	{
-		neon_eagle2x_16_16((const void *)(vram + vram_ofs), (void *)dest, w,
-			2048, dstride * 2, h);
-	}
-#endif
 	else if (!pl_scanlines_by_plat && scanlines != 0 && scanline_level != 100 && psx_bpp == 16)
 	{
 		// an enhanced (2x) frame comes from the plugin's own buffer, which does not wrap at 1 MB

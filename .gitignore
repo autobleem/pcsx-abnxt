@@ -39,6 +39,7 @@ psx_gpu_offsets_update
 # un-ignored, hence the /tools/* form above)
 !/tools/win_drive.ps1
 !/tools/make_packages.sh
+!/tools/vendor_hqx.py
 
 /dist/
 /build_win_rel/
