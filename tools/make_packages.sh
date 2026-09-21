@@ -77,7 +77,7 @@ pack_windows
 # the manifest
 {
     printf '{\n  "name": "pcsx-abnxt",\n  "version": "%s",\n  "commit": "%s",\n  "date": "%s",\n' "$VERSION" "$COMMIT" "$DATE"
-    printf '  "note": "a development build of the next emulator - runs on the PlayStation Classic and the Raspberry Pi; the compatibility pass is still to come",\n'
+    printf '  "note": "alpha of the next emulator - runs on the PlayStation Classic, the Raspberry Pi and a PC; the compatibility pass is still to come",\n'
     printf '  "files": {\n'
     first=1
     for f in "${files[@]}"; do
