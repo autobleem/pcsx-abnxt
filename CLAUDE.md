@@ -22,8 +22,12 @@ compatibility pass (the 20 built-in games and the `title.h` titles on the consol
 boot, the first minutes, a save, FMV, CDDA, a real disc swap - Parasite Eve / RE2 / FF7; a regression that
 reproduces gets a `database.c` entry or an upstream issue; the pass list goes here; also the pcsx-ab test
 material on `D:\AB\Games` - CHDs with CDDA, the 30-track cue, PBPs), which is what decides which of
-Sony's 131 per-title hacks are needed; **the console has never run pcsx-abnxt** (drop the psc tarball
-over `Autobleem/bin/emunxt/`); and phase 8, the release - nxt as *the* emulator in `emu/`, `pcsx-ab2`
+Sony's 131 per-title hacks are needed; **the console's first run of pcsx-abnxt (2026-09-21, r26-56) died at
+the game's first frame** - SIGSEGV inside SDL 2.0.12's `SDL_SetTextureScaleMode()` on an RGB565 texture,
+which the GLES2 renderer wraps around a native 8888 one and 2.0.12 forgets to unwrap (fixed in 2.0.14; the
+Pi's 2.28 and Windows' 2.30 never showed it) - fixed in libpicofe `e487c91` (the scale mode only through
+the creation hint, the prescale target keyed on its filter too), the re-run on the console is next (drop
+the psc tarball over `Autobleem/bin/emunxt/`); and phase 8, the release - nxt as *the* emulator in `emu/`, `pcsx-ab2`
 archived on GitHub - which only makes sense after that pass. Out of scope by decision: the libretro core
 build, Sony's `UI_INTEGRATION`/`.sts`/the Pandora-Maemo-Caanoo platforms, GPU/SPU features beyond
 upstream's; a "which disc" picker in the launcher's resume menu and the `.m3u` hand-over are follow-ups.
@@ -108,6 +112,22 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
   logo=... scanlines=...`), and the cursor calls. On the Pi: stop `autobleem.service`, run
   `Autobleem/rc/launch.sh <ss> <cue> 2 4 <game> 0 <aspect> <filter> NA pcsx-abnxt` under `sudo` with the
   env, then start the service again. `tools/win_drive.ps1 -AttachPid` drives an emulator started under gdb.
+- **a crash on the console** (how r26-56's was found): the launcher's `rc/launch.sh` leaves the emulator's
+  stdout+stderr in `System/Logs/pcsx.log` with the exit status (139 = SIGSEGV) and `launch.log` says
+  `(core dumped)`, but the core goes to the console's `systemd-coredump` pipe, there is no `ldd`, and
+  `/tmp/runpcsx` is wiped by the next launch. A debug `launch.sh` on the stick (root: `echo /tmp/core.%e.%p
+  > /proc/sys/kernel/core_pattern` before the run, restored after; `cp /tmp/core.* System/Logs/pcsx-core`;
+  `cp -L` of `/lib/{ld-linux-armhf.so.3,libc.so.6,...}`, `/tmp/lib/libSDL2-2.0.so.0` and `/usr/lib/lib{EGL,
+  GLESv2*,PVR*,srv_um,wayland*,gbm,drm}*` into `System/Logs/psc-libs/`) brings an 83 MB core home, and
+  `arm-linux-gnueabihf-gdb` (SysGCC's, `C:\SysGCC\raspberry\bin`) reads it with `set sysroot .`,
+  `set solib-search-path psc-libs`, `file <unstripped>`, `core-file pcsx-core`, `bt` - the unstripped
+  `build_psc/pcsx-ab` stays on the build server (`~/pcsx-abnxt/build_psc/`; check the GNU build id against
+  the shipped one with `readelf -n`). **The console runs the SDL 2.0.12 of AutoBleem's `libs.tar.gz`**
+  (unpacked to `/tmp/lib` at boot, `LD_LIBRARY_PATH` inherited from the launcher; the firmware's own
+  `/usr/lib` SDL is 2.0.4) - the same build the emulator links against in the Docker image, so SDL
+  functions newer than 2.0.12 do not exist there and 2.0.12's own bugs do. Kernel 4.4.22 armv7l, Weston,
+  the PowerVR GLES2 driver (`libGLESv2_PVR_MESA.so`); "PVR:(Error): glBufferSubData: No memory for object
+  data" in the log is the driver's noise at the first present, not a failure.
 
 | | |
 |---|---|
@@ -118,7 +138,7 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
 | Build | `CMakeLists.txt`: upstream's `configure`/`Makefile` as CMake options (`PCSXAB_*`), the plugins, libchdr/lightrec/lightning/mman compiled from `deps/`; upstream's own build files stay untouched. `PCSXAB_PLATFORM=sdl2` (ours, the default), `sdl` (upstream's SDL 1.2 frontend, needs sdl12-compat on a PC) or `headless` |
 | Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** - Crash Bandicoot's intro in a 1280x720 window, Esc opens the menu, `tools/win_drive.ps1` drives it from a script (keys, screenshots, `-EmuArgs`, `close`) |
 | Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU, the SDL2 platform - **the 64-bit build runs on the Pi 400** (2026-09-20), 32-bit built, unrun |
-| PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`, SDL 2.0.12): builds and links, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - **unrun** (`build_psc/dist/` on the PC holds the last fetch); `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
+| PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`, SDL 2.0.12): builds and links, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - **ran on the console 2026-09-21 up to the first frame** (SDL 2.0.12's bug, above; `build_psc/dist/` on the PC holds the last fetch); `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
 | Local checkout | `E:\Programming\pcsx-abnxt` |
 | Packages | `tools/make_packages.sh` -> `dist/packages/pcsx-abnxt-<git describe>-{psc,rpi-armhf,rpi-arm64}.tar.gz`, `-win64.zip` (from `build_win_rel`, a Release configure of the same tree) and a manifest json; the Linux dists come from the build server (`ssh psc-build`, `~/pcsx-abnxt` an rsync copy without `.git`: `AB_GIT_DESCRIBE=$(git describe)` in the environment is what CMake bakes into `REV` there, through `docker/run.sh`'s `AB_*` pass-through - without it the menu's build line says "(no version)"); published with autobleem-develop's `tools/repo_publish.sh pcsx <version> dist/packages/*` to **`https://autobleem.retromenele.pl/emu/pcsx-abnxt/`** (`latest.json`, the newest kept; first publish `r26-20-gb9801962`, 2026-09-20, marked a development build) |
 
