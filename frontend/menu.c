@@ -46,7 +46,9 @@
 #include "compiler_features.h"
 #include "arm_features.h"
 #include "revision.h"
+#ifdef PSCLASSIC
 #include "ab/ab_config.h"
+#endif
 
 #define REARMED_BIRTHDAY_TIME 1293306830	/* 25 Dec 2010 */
 #if defined(__linux__) && (!defined(__SIZEOF_POINTER__) || __SIZEOF_POINTER__ == 4)
@@ -764,7 +766,9 @@ fail:
 	if (strcmp(mcd1_old, Config.Mcd1) || strcmp(mcd2_old, Config.Mcd2))
 		LoadMcds(Config.Mcd1, Config.Mcd2);
 
+#ifdef PSCLASSIC
 	ab_config_loaded(is_game);
+#endif
 	return ret;
 }
 
@@ -934,8 +938,10 @@ me_bind_action emuctrl_actions[] =
 	{ "Volume Down      ", 1 << SACTION_VOLUME_DOWN },
 #endif
 	{ "Analog toggle    ", 1 << SACTION_ANALOG_TOGGLE },
+#ifdef PSCLASSIC
 	{ "CD Change button ", 1 << SACTION_AB_CD_CHANGE },
 	{ "RESET button     ", 1 << SACTION_AB_RESET },
+#endif
 	{ NULL,                0 }
 };
 
@@ -2526,8 +2532,10 @@ static menu_entry e_menu_main[] =
 
 static void menu_leave_emu(void);
 
+#ifdef PSCLASSIC
 /* AutoBleem's menu over this one, from the same translation unit */
 #include "ab/ab_menu.c"
+#endif
 
 void menu_loop(void)
 {
@@ -2557,8 +2565,14 @@ void menu_loop(void)
 
 	in_set_config_int(0, IN_CFG_BLOCKING, 1);
 
+#ifdef PSCLASSIC
 	ab_menu_loop_d();	/* AutoBleem's menu, e_menu_main one level down (ab/ab_menu.c) */
 	(void)sel;
+#else
+	do {
+		me_loop_d(e_menu_main, &sel, NULL, draw_frame_main);
+	} while (!ready_to_go && !g_emu_want_quit);
+#endif
 
 	/* wait until menu, ok, back is released */
 	while (in_menu_wait_any(NULL, 50) & (PBTN_MENU|PBTN_MOK|PBTN_MBACK))
