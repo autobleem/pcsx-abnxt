@@ -1,0 +1,204 @@
+# pcsx-abnxt CI - the next PS1 emulator, a near-copy of pcsx-ab's build.yml (autobleem2 org migration,
+# docs/ci-org-migration-plan.md in the launcher repo). Four Linux targets in the shared autobleem-build
+# image; the Windows .exe natively on windows-latest with MSYS2 UCRT64; `package` -> the site packages
+# (tools/make_packages.sh); `publish` (self-hosted, tag/manual only) -> emu/pcsx-abnxt/ (repo_publish kind
+# `pcsx`). Differences from pcsx-ab: recursive submodules (libpicofe et al.), `git describe` versioning, and
+# the Windows build needs sdl12-compat + an explicit SDL2.dll (sdl12-compat's SDL.dll loads it at run time,
+# which ldd cannot see).
+#
+# Nothing runs until the repository variable AB_CI_ENABLED is 'true'.
+name: build
+
+on:
+  push:
+    branches: [develop, master]
+    tags: ['v*']
+  pull_request:
+    branches: [develop, master]
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: where to build the Linux targets
+        type: choice
+        options: [github, self-hosted]
+        default: github
+      targets:
+        description: targets to build (space separated; psc rpi rpi64 pcusb win; empty = all)
+        type: string
+        default: ''
+      publish:
+        description: publish the packages to the site under emu/pcsx-abnxt/ (self-hosted only)
+        type: boolean
+        default: false
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/autobleem2/autobleem-build:latest
+
+jobs:
+  plan:
+    if: vars.AB_CI_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.t.outputs.json }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # git describe needs upstream's r26 tag and our commits past it
+      - id: t
+        run: |
+          t="${{ inputs.targets }}"
+          [ -n "$t" ] || t="psc rpi rpi64 pcusb win"
+          lin="$(printf '%s\n' $t | grep -vx win || true)"
+          echo "json=$(printf '%s\n' $lin | jq -R . | jq -cs 'map(select(length>0))')" >> "$GITHUB_OUTPUT"
+      - id: v
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$(git describe --always --tags)" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: ${{ matrix.target }}
+    needs: plan
+    if: needs.plan.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    runs-on: ${{ (github.event_name != 'pull_request' && inputs.runner == 'self-hosted') && 'self-hosted' || 'ubuntu-24.04' }}
+    container:
+      image: ghcr.io/autobleem2/autobleem-build:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    env:
+      SCCACHE_GHA_ENABLED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: mozilla-actions/sccache-action@v0.0.6
+      - name: Build ${{ matrix.target }}
+        run: ci/build.sh ${{ matrix.target }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: build_${{ matrix.target }}/dist/
+          retention-days: 30
+
+  windows:
+    needs: plan
+    if: >-
+      vars.AB_CI_ENABLED == 'true' &&
+      (inputs.targets == '' || contains(format(' {0} ', inputs.targets), ' win '))
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-libpng
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-sdl12-compat
+            mingw-w64-ucrt-x86_64-SDL2
+      - name: Build (Release)
+        run: |
+          cmake -G Ninja -S . -B build_win_rel -DCMAKE_BUILD_TYPE=Release
+          cmake --build build_win_rel
+      - name: Stage the shippable files
+        run: |
+          mkdir -p winstage/plugins
+          cp build_win_rel/pcsx-ab.exe winstage/
+          # sdl12-compat's SDL.dll loads SDL2.dll at run time, invisible to ldd - copy it explicitly
+          for dll in $(ldd build_win_rel/pcsx-ab.exe | awk '/ucrt64/ {print $3}') /ucrt64/bin/SDL2.dll; do cp -u "$dll" winstage/; done
+          cp build_win_rel/plugins/*.dll winstage/plugins/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-win
+          path: winstage/
+          retention-days: 30
+
+  package:
+    needs: [plan, build, windows]
+    if: ${{ always() && needs.plan.result == 'success' && needs.build.result != 'failure' }}
+    runs-on: ubuntu-24.04
+    container:
+      image: ghcr.io/autobleem2/autobleem-build:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # make_packages copies skin/lang from the source tree; the version is git describe
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+      - name: Reassemble and package
+        run: |
+          for t in psc rpi rpi64 pcusb; do
+            [ -d "dist-$t" ] || continue
+            mkdir -p "build_$t"
+            rm -rf "build_$t/dist"
+            mv "dist-$t" "build_$t/dist"
+            [ -f "build_$t/dist/pcsx-ab" ] && chmod +x "build_$t/dist/pcsx-ab" || true
+          done
+          if [ -d dist-win ]; then
+            mkdir -p build_win_rel
+            cp -a dist-win/. build_win_rel/
+          fi
+          tools/make_packages.sh --version "${{ needs.plan.outputs.version }}"
+          ls -l dist/packages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: dist/packages/
+          retention-days: 30
+
+  publish:
+    needs: [plan, package]
+    if: >-
+      inputs.runner != 'github' && (
+        startsWith(github.ref, 'refs/tags/v') ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish)
+      )
+    runs-on: self-hosted
+    container:
+      image: ghcr.io/autobleem2/autobleem-build:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      volumes:
+        - /home/claude/autobleem-repo:/srv/autobleem-repo
+    env:
+      REPO_DIR: /srv/autobleem-repo
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: autobleem2/autobleem
+          path: autobleem
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: dist/packages
+      - name: Publish to the site
+        run: autobleem/tools/repo_publish.sh --local pcsx "${{ needs.plan.outputs.version }}" dist/packages/*
