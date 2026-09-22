@@ -124,6 +124,18 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
   (upstream's exe-relative dir was `/tmp/plugins`, empty).
 - the AutoBleem menu has Controller 1/2 (standard/analog/guns/none), Scanlines + brightness and Screen
   (4:3 / 16:9 over `g_scaler`) - what pcsx-ab's Sony menu offered.
+- **the debug driver** (2026-09-22, `frontend/ab/ab_debug.c`, the shape of the launcher's own
+  `DebugDriver`): `AB_DEBUG_PORT=<port>` starts a TCP line server on the loopback that pushes keys into
+  SDL's event queue (so they take the real path: in_sdl2 -> the binds -> the menu or the game) and hands
+  frames back - `press/down/up <key>`, `wait`, `shot <file.bmp>` (the readback happens in the present that
+  follows the request, `plat_sdl2_shot_*` in libpicofe; a menu presents only when it redraws, so the shot
+  pushes an expose first - `PBTN_RDRAW`), `screen` (boot/game/menu/pcsx/disc/message, set where our menus
+  draw), `row` (the highlighted row's name - libpicofe's `menu_sel_name`, kept by every `me_draw`),
+  `status`, `frames`, `quit`. `tools/emu_drive.py start|run|stop|sheet` is the client: `run "press escape;
+  wait_screen menu; enter PCSX menu; enter Options; enter [Display]; shot d.png"` - `enter`/`select` walk
+  by row name instead of counting keypresses, and a crash comes back as the connection dying with the tail
+  of `build_win/run/err.txt`. Nothing of it runs without the variable. On a Pi or the console: start the
+  emulator with `AB_DEBUG_PORT` and `ssh -L`, then `--host/--port`.
 - **debugging a display one cannot see**: `PLAT_SDL2_SHOT=/tmp/shot%d.bmp` saves the presented frame every
   5 s (the emulator's own screenshot is the raw PSX frame); `AB_err.txt` has one line per video mode
   (`video mode: 1024x480 (psx 512x240)`) and per loaded config (`autobleem: game config: filter=... boot
@@ -154,7 +166,7 @@ disc. Keyboard: F9 = Open, F10 = Reset (the console's `eject`/`reset` keys are b
 | Branches | `master` mirrors upstream master (fast-forward only, never committed to); `develop` is ours; `feature/<slug>` off `develop`, merged `--no-ff` (gitflow, as in every AutoBleem repo); `upstream` remote = notaz |
 | libpicofe | submodule `frontend/libpicofe` -> **`github.com/autobleem/libpicofe`** (our fork of notaz's), branch `develop`: r26's commit plus our SDL2 files (`plat_sdl2.*`, `in_sdl2.*`, `in_sdl2gc.*`); `upstream` remote there too. The other submodules (`deps/libchdr`, `lightrec`, `lightning`, `libretro-common`, `mman`, `frontend/warm`) are upstream's, untouched |
 | Build | `CMakeLists.txt`: upstream's `configure`/`Makefile` as CMake options (`PCSXAB_*`), the plugins, libchdr/lightrec/lightning/mman compiled from `deps/`; upstream's own build files stay untouched. `PCSXAB_PLATFORM=sdl2` (ours, the default), `sdl` (upstream's SDL 1.2 frontend, needs sdl12-compat on a PC) or `headless` |
-| Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** - Crash Bandicoot's intro in a 1280x720 window, Esc opens the menu, `tools/win_drive.ps1` drives it from a script (keys, screenshots, `-EmuArgs`, `close`) |
+| Windows | `./make_win.sh` -> `build_win/pcsx-ab.exe`: **lightrec + C-SIMD gpu_neon, plays games** - Crash Bandicoot's intro in a 1280x720 window, Esc opens the menu, `tools/emu_drive.py` drives it over the debug driver's socket (see "the debug driver"); `tools/win_drive.ps1` is the older way, keys posted to the window |
 | Pi 32-bit / 64-bit | `./make_rpi.sh`, `./make_rpi64.sh` -> `build_rpi*/dist/`: Ari64 ARM / ARM64 dynarec, NEON asm / C-SIMD GPU, the SDL2 platform - **the 64-bit build runs on the Pi 400** (2026-09-20), 32-bit built, unrun |
 | PlayStation Classic | `ci/build.sh psc` in the Docker image (gcc-6, `/opt/psc`, SDL 2.0.12): builds and links, GLIBC <= 2.12, no RPATH, ARM dynarec + NEON - **runs on the console since 2026-09-21** (`build_psc/dist/` on the PC holds the last fetch; the console's SDL is 2.0.12, see "a crash on the console"); `make_psc.sh` is the Sony-toolchain path over ssh, untested here |
 | Local checkout | `E:\Programming\pcsx-abnxt` |
@@ -191,7 +203,7 @@ start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells 
 the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Smoothing, Screen, Scanlines,
 the controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
 `autobleem.cfg`, Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
-libpicofe's menu.c because the menu machinery is static there. `ab_scaler.c` + `hqx/`: the smoothing
+libpicofe's menu.c because the menu machinery is static there. `ab_debug.c`: the debug driver (see "the debug driver"; `AB_DEBUG_PORT` only). `ab_scaler.c` + `hqx/`: the smoothing
 scalers (see "Smoothing"; `tools/vendor_hqx.py` regenerates `hqx/hq2x.c`/`hq3x.c` from a clone of
 grom358/hqx). Player 2's sticks: `in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
 
@@ -263,7 +275,8 @@ cannot test the resume path.
   in the common plugin_lib block) build the same emulator as our CMake, which defines `PSCLASSIC` itself.
   Verified: `--platform=generic` links upstream's `pcsx` with nothing of ours but the soft filter, and
   `--platform=psclassic` with the console toolchain links our emulator (same libraries as the CMake one).
-  The libpicofe fork needs no gating: six new files, no line of notaz's changed. The CMake build stays the
+  The libpicofe fork needs no gating: six new files, and of notaz's own only `menu.c`/`menu.h` touched -
+  one line each, `menu_sel_name` (the highlighted row's name, which the debug driver reads). The CMake build stays the
   one the scripts and CI use; the Makefile path is the shape a future PR to notaz would take.
 - **Video**: one SDL2 platform everywhere - window + `SDL_GL_CreateContext` (Wayland on the console, KMSDRM
   on the Pi, WGL on Windows) into libpicofe's `gl.c`, SDL_Renderer as the fallback. No hand-written Wayland

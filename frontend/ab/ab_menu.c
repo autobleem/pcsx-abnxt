@@ -23,6 +23,7 @@
 #include "ab_disc.h"
 #include "ab_buttons.h"
 #include "ab_console.h"
+#include "ab_debug.h"
 #include "ab_ui.h"
 
 /* our ids, past the menu.c enum's */
@@ -280,6 +281,7 @@ static void ab_draw_disc_picker(int n, int cur, int sel)
 	int r, gap, step, x0, cy, i;
 	char label[80];
 
+	ab_debug_screen("disc");
 	c = ab_screen_begin();
 	s = c.h / 720.0f;
 	ab_text_shadow(&c, (int)(40 * s), (int)(40 * s), AB_UI_LEFT, ab_ui_str(AB_STR_CHANGE_DISC), (int)(36 * s), ab_col_text);
@@ -314,6 +316,7 @@ static void ab_draw_message(const char *msg)
 
 	int px, w;
 
+	ab_debug_screen("message");
 	c = ab_screen_begin();
 	s = c.h / 720.0f;
 	px = (int)(32 * s);
@@ -510,6 +513,7 @@ static void ab_menu_draw(const menu_entry *menu, int sel)
 	float s;
 	int n, i, y, x, px, row_h, pad, panel_x, panel_y, panel_w, panel_h, x_name, x_val;
 
+	ab_debug_screen("menu");
 	c = ab_screen_begin();
 	s = c.h / 720.0f;
 
@@ -536,6 +540,8 @@ static void ab_menu_draw(const menu_entry *menu, int sel)
 			ent_sel = ent;
 		n++;
 	}
+	if (ent_sel != NULL)
+		menu_sel_name = ent_sel->name;	/* as libpicofe's menus do, for the debug driver */
 	px = (int)(24 * s);
 	row_h = (int)(34 * s);
 	pad = (int)(18 * s);
@@ -675,6 +681,7 @@ static int ab_menu_pcsx_handler(int id, int keys)
 	me_enable(e_menu_main, MA_MAIN_RESET_GAME,  ready_to_go);
 	me_enable(e_menu_main, MA_MAIN_CHEATS,      ready_to_go && NumCheats);
 
+	ab_debug_screen("pcsx");	/* upstream's menu and its pages, until we draw ours again */
 	return me_loop_d(e_menu_main, &sel, NULL, draw_frame_main);
 }
 

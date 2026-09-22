@@ -16,6 +16,7 @@
 #include "ab_buttons.h"
 #include "ab_autosave.h"
 #include "ab_console.h"
+#include "ab_debug.h"
 #include "ab_session.h"
 #include "ab_disc.h"
 
@@ -116,6 +117,7 @@ void ab_frame_tick(void)
 {
 	static int started;
 
+	ab_debug_screen("game");	/* a frame of the game: what the debug driver reports until a menu draws */
 	if (!started) {
 		started = 1;
 		ab_console_start();

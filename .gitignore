@@ -38,6 +38,7 @@ psx_gpu_offsets_update
 # our own tools/ files (upstream ignores the directory; a file under an ignored directory cannot be
 # un-ignored, hence the /tools/* form above)
 !/tools/win_drive.ps1
+!/tools/emu_drive.py
 !/tools/make_packages.sh
 !/tools/vendor_hqx.py
 !/tools/gen_sony_hacks.py

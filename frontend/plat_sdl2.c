@@ -36,6 +36,7 @@
 #include "plat.h"
 #include "revision.h"
 #include "ab/ab_config.h"
+#include "ab/ab_debug.h"
 
 /* the keyboard: the same keys upstream's SDL 1.2 platform binds, by scancode */
 static const struct in_default_bind in_sdl2_defbinds[] = {
@@ -244,6 +245,7 @@ void plat_init(void)
   pl_rearmed_cbs.pl_get_layer_pos = get_layer_pos;
   plat_target.hwfilters = hwfilters;
   plugin_update();
+  ab_debug_start();	/* AB_DEBUG_PORT: the test driver, after the input drivers it pushes keys to */
 }
 
 void plat_finish(void)
