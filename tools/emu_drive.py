@@ -4,6 +4,8 @@ socket - the way tools/ab_drive.py drives the launcher. A whole walk through the
 needs nobody at the machine; a crash is caught as the connection dying, with the log's tail.
 
   python tools/emu_drive.py start [--game CUE] [--port N] [--emu-args "..."] [--no-bios] [--fullscreen]
+                                 [--exe PATH]          another build than build_win's, e.g. build_win_rel's
+                                                       before a release is published
                                        the Windows build (build_win/pcsx-ab.exe) on a game, with
                                        AB_DEBUG_PORT; waits for the first frame. The BIOS files of
                                        autobleem-develop are linked into build_win/run/.pcsx/bios unless
@@ -181,14 +183,14 @@ def link_bios():
             f.write('Bios = SET_BY_PCSX\n')   # ab_config.c: romw.bin / romJP.bin by the disc's region
 
 
-def start(game, port, emu_args, bios=True, fullscreen=False):
+def start(game, port, emu_args, bios=True, fullscreen=False, exe=EXE):
     os.makedirs(RUN_DIR, exist_ok=True)
     if bios:
         link_bios()
     env = dict(os.environ)
     env['AB_DEBUG_PORT'] = str(port)
     env['AB_NO_AUTOSAVE'] = '1'     # no save-state ring in a test run
-    argv = [EXE, '-cdfile', game] + emu_args
+    argv = [exe, '-cdfile', game] + emu_args
     if fullscreen:
         argv.append('-fullscreen')
     out = open(os.path.join(RUN_DIR, 'out.txt'), 'w')
@@ -270,7 +272,8 @@ def main(argv):
         if '--game' in args:
             game = args[args.index('--game') + 1]
         emu_args = args[args.index('--emu-args') + 1].split() if '--emu-args' in args else []
-        start(game, port, emu_args, '--no-bios' not in args, '--fullscreen' in args)
+        exe = args[args.index('--exe') + 1] if '--exe' in args else EXE
+        start(game, port, emu_args, '--no-bios' not in args, '--fullscreen' in args, exe)
         return 0
     if cmd == 'stop':
         stop(port)
