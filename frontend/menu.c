@@ -2800,7 +2800,8 @@ void menu_init(void)
 	me_enable(e_menu_gfx_options, MA_OPT_SWFILTER, 0);
 #endif
 	me_enable(e_menu_gfx_options, MA_OPT_VARSCALER, MENU_SHOW_VARSCALER);
-	me_enable(e_menu_gfx_options, MA_OPT_VOUT_MODE, MENU_SHOW_VOUTMODE);
+	me_enable(e_menu_gfx_options, MA_OPT_VOUT_MODE,
+		MENU_SHOW_VOUTMODE && plat_target.vout_methods != NULL);
 	me_enable(e_menu_gfx_options, MA_OPT_VARSCALER_C, MENU_SHOW_VARSCALER_C);
 	me_enable(e_menu_gfx_options, MA_OPT_SCALER2, MENU_SHOW_SCALER2);
 	me_enable(e_menu_keyconfig, MA_CTRL_NUBS_BTNS, MENU_SHOW_NUBS_BTNS);

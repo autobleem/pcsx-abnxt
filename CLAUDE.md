@@ -199,7 +199,10 @@ Upstream files edited so far (the whole list - keep it that way): `frontend/main
 for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
 default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
 default, our four `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
-names, `men_soft_filter`'s five names on every platform), `frontend/menu.h` (`SOFT_FILTER_HQ2X/HQ3X`),
+names, `men_soft_filter`'s five names on every platform; `menu_init` keeps the "Video output mode" row off
+when the platform has no `vout_methods` - ours has none, and upstream's `MENU_SHOW_VOUTMODE` default of 1
+re-enabled the row with a NULL name list, which crashed the PCSX menu's [Display] page on every target,
+found on the console with r26-alpha1 - a PR candidate), `frontend/menu.h` (`SOFT_FILTER_HQ2X/HQ3X`),
 `frontend/plugin_lib.c` (`ab_frame_tick()`; the analog tables at 4 and `update_analogs()` over both
 players; `pl_scanlines_by_plat`; the smoothing: `ab_soft_scale_factor()` in `pl_vout_set_mode`,
 `ab_soft_blit()` in the flip in place of the `HAVE_NEON32` scalers, `resolution_ok()` against
