@@ -36,7 +36,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE: ghcr.io/autobleem2/autobleem-build:latest
+  IMAGE: ghcr.io/autobleem2/autobleem-build:${{ startsWith(github.ref, 'refs/tags/v') && 'latest' || 'develop' }}
 
 jobs:
   plan:
@@ -73,7 +73,7 @@ jobs:
         target: ${{ fromJSON(needs.plan.outputs.targets) }}
     runs-on: ${{ (github.event_name != 'pull_request' && inputs.runner == 'self-hosted') && 'self-hosted' || 'ubuntu-24.04' }}
     container:
-      image: ghcr.io/autobleem2/autobleem-build:latest
+      image: ghcr.io/autobleem2/autobleem-build:${{ startsWith(github.ref, 'refs/tags/v') && 'latest' || 'develop' }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -152,7 +152,7 @@ jobs:
     if: ${{ always() && needs.plan.result == 'success' && needs.build.result != 'failure' }}
     runs-on: ubuntu-24.04
     container:
-      image: ghcr.io/autobleem2/autobleem-build:latest
+      image: ghcr.io/autobleem2/autobleem-build:${{ startsWith(github.ref, 'refs/tags/v') && 'latest' || 'develop' }}
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -252,5 +252,5 @@ jobs:
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD:$PWD" -w "$PWD" -v "$AB_REPO_DIR:$AB_REPO_DIR" -e REPO_DIR="$AB_REPO_DIR" \
-            ghcr.io/autobleem2/autobleem-build:latest \
+            ghcr.io/autobleem2/autobleem-build:${{ startsWith(github.ref, 'refs/tags/v') && 'latest' || 'develop' }} \
             bash autobleem-repo-tools/tools/repo_publish.sh --local pcsx "${{ needs.plan.outputs.version }}" dist/packages/*
