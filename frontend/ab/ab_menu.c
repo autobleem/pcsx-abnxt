@@ -613,7 +613,15 @@ static void ab_menu_draw(const menu_entry *menu, int sel)
 	ab_footer(&c, "Select", ready_to_go ? "Resume" : "Back");
 	px = (int)(17 * s);
 	x = c.w - (int)(40 * s);
-	snprintf(buf, sizeof(buf), "pcsx-abnxt %s", REV[0] != 0 ? REV : "(no version)");
+	/* the package's version (AB_VERSION, exported by the launcher) - what every program on the stick shows;
+	   the emulator's own git describe only when it was started without the launcher */
+	{
+		const char *version = getenv("AB_VERSION");
+		if (version && *version)
+			snprintf(buf, sizeof(buf), "AutoBleem %s", version);
+		else
+			snprintf(buf, sizeof(buf), "pcsx-abnxt %s", REV[0] != 0 ? REV : "(no version)");
+	}
 	ab_text(&c, x, (int)(636 * s), AB_UI_RIGHT, buf, px, ab_col_text);
 	snprintf(buf, sizeof(buf), "PCSX-ReARMed  \xc2\xb7  %s  \xc2\xb7  %s  \xc2\xb7  built %s", ab_cpu_name(), ab_gpu_name(), __DATE__);
 	ab_text(&c, x, (int)(660 * s), AB_UI_RIGHT, buf, px, ab_col_dim);

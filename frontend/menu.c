@@ -10,6 +10,7 @@
 
 #define _GNU_SOURCE 1
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #ifndef NO_DYLIB
@@ -2148,7 +2149,12 @@ static void draw_frame_main(void)
 
 static void draw_frame_credits(void)
 {
-	smalltext_out16(4, 1, "build: " __DATE__ " " __TIME__ " " REV, 0xe7fc);
+	// AutoBleem: the package's version (AB_VERSION, exported by the launcher), as every program on the
+	// stick shows it; the emulator's own git describe only when started without the launcher
+	const char *version = getenv("AB_VERSION");
+	char buff[128];
+	snprintf(buff, sizeof(buff), "AutoBleem %s", version && *version ? version : REV);
+	smalltext_out16(4, 1, buff, 0xe7fc);
 }
 
 static const char credits_text[] = 
