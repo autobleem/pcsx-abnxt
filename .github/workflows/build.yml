@@ -208,6 +208,22 @@ jobs:
             --title "pcsx-abnxt ${GITHUB_REF_NAME}" --generate-notes $prerelease \
             packages/*
 
+  # the rolling development build: every successful build of develop replaces the assets of this repository's
+  # `nightly` pre-release (autobleem-build's nightly-release action), which autobleem-appliance's nightly
+  # assembly fetches the way it fetches a v* release. Never for a pull request or a tag.
+  nightly:
+    if: github.ref == 'refs/heads/develop' && github.event_name != 'pull_request'
+    needs: [plan, package]
+    runs-on: ubuntu-24.04
+    permissions: { contents: write }
+    steps:
+      - uses: actions/download-artifact@v8
+        with: { name: packages, path: out }
+      - uses: autobleem2/autobleem-build/.github/actions/nightly-release@master
+        with:
+          files: out/*
+          version: ${{ needs.plan.outputs.version }}
+
   publish:
     # the site's emu/ tree, on the build server's disk: the self-hosted runner. Not a `container:` job -
     # that runner is itself a container, and the Actions runner will not nest one in it ("Container
