@@ -51,10 +51,11 @@ screens draw on the same screen (`ab_screen_begin`, the discs on a panel, the hi
 `make_rpi*.sh`'s dist step ships `skin/` + `lang/` like `ci/build.sh`'s. **`ab_ui` looks in the run
 directory first** (`data_path`): the launch scripts copy the binary to `/tmp/pcsx` and link `skin/`,
 `lang/`, `fonts/` into `/tmp/runpcsx`, so `emu_make_data_path` (exe-relative) found nothing on the Pi.
-**The menu button off the console** (`ab_filter_action`, hooked into `update_input()`): no front buttons
-there, so a press opens the menu on release and a **2 s hold is Reset** (the HUD says "HOLD TO EXIT" from
-0.5 s; the Exit row's help says so); on the console (`ab_console_present()`) the button opens the menu at
-once as before. `tools/win_drive.ps1` holds a key with `name:ms`.
+**The menu button** (`ab_filter_action`, hooked into `update_input()`): a press opens the menu on release
+and a **2 s hold is Reset** (the HUD says "HOLD TO EXIT" from 0.5 s; the Exit row's help says so). On every
+platform since 2026-09-24 - the console used to open the menu at once, leaving Reset to the front button,
+but its pad has no Home and Select+Start held is the way out players reach for (`in_sdl2gc` turns
+Select+Start into Home on a pad whose mapping has no `guide`). `tools/win_drive.ps1` holds a key with `name:ms`.
 
 **The disc picker and the emulator's own language** (2026-09-20, phase 5 complete): the Open button and
 the menu's "Change disc" open `ab_disc_screen()` (`ab_menu.c`) over the menu's screen - the set's discs in

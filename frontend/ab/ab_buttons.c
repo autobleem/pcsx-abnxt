@@ -25,7 +25,7 @@ extern enum sched_action emu_action, emu_action_old;
 static int reset_held;		/* a Reset that waits for a memory-card write to finish */
 static int power_off_seen, overheat_seen;
 
-#define AB_MENU_HOLD_MS   2000	/* the menu button held this long is Reset, off the console */
+#define AB_MENU_HOLD_MS   2000	/* the menu button held this long is Reset */
 #define AB_MENU_HINT_MS   500	/* ...and says so on the HUD from here */
 static const char hold_hint[] = "HOLD TO EXIT";
 
@@ -49,16 +49,12 @@ static void reset_now(const char *why)
 
 int ab_filter_action(int action)
 {
-	static int on_console = -1;
 	static int held, fired;
 	static unsigned int held_since;
 	unsigned int now;
 
-	if (on_console < 0)
-		on_console = ab_console_present();
-	if (on_console)
-		return action;
-
+	/* the console too (2026-09-24; the menu used to open at once there): its pad has no Home, and
+	 * Select+Start held is the way out that does not mean reaching for the front of the console */
 	now = plat_get_ticks_ms();
 	if (action == SACTION_ENTER_MENU) {
 		if (!held) {

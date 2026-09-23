@@ -11,10 +11,10 @@
  * A Reset that lands while the game is writing its memory card is held until the write is over, so the
  * resume point never contains half a card (Sony's memcardResetFlag).
  *
- * Off the console there are no front buttons, and leaving a game meant the menu, Exit, Cross. So there
- * the menu button (the pad's Home, Select+Start, Escape) does both: a press opens the menu when it is
- * released, a hold of 2 s is Reset (ab_filter_action). On the console the button opens the menu at once,
- * as before - its Reset is on the front.
+ * The menu button (the pad's Home, Select+Start on a pad without one - the console's own - or Escape) does
+ * two things: a press opens the menu when it is released, a hold of 2 s is Reset (ab_filter_action). On
+ * every platform: off the console there are no front buttons at all, and on it (since 2026-09-24; the menu
+ * used to open at once there) leaving a game should not mean reaching for the front of the console.
  *
  * Everything that touches the emulator's state (a snapshot, a disc change, the exit) runs as an emulator
  * action, between two CPU slices; the frame tick only decides and asks (ab_request_action).

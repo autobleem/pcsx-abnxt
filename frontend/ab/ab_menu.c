@@ -60,7 +60,7 @@ static const char *men_ab_aspect[] = { "4:3", "16:9 (fullscreen)", NULL };
 static const char h_ab_aspect[]  = "4:3 as the PlayStation drew it, or stretched over the whole screen";
 static const char h_ab_pad[]     = "Standard (digital), analog (DualShock), a gun or nothing;"
                                    " takes effect when the game goes on";
-/* off the console only: there the front button is the way out (ab_buttons.h) */
+/* the Exit row's help, on every platform (ab_buttons.h) */
 static const char h_ab_exit[]    = "Back to AutoBleem - holding the menu button for 2 seconds in the game"
                                    " does the same";
 
@@ -703,7 +703,7 @@ static void ab_menu_loop_d(void)
 	me_enable(e_menu_ab, MA_AB_QUICKLOAD, ready_to_go && CdromId[0]);
 	me_enable(e_menu_ab, MA_AB_DISC,      ready_to_go && CdromId[0]);
 	me_enable(e_menu_ab, MA_AB_FILTER,    plat_target.hwfilters != NULL);
-	e_menu_ab[me_id2offset(e_menu_ab, MA_MAIN_EXIT)].help = ab_console_present() ? NULL : h_ab_exit;
+	e_menu_ab[me_id2offset(e_menu_ab, MA_MAIN_EXIT)].help = h_ab_exit;
 
 	ab_ui_load(ab_opts.language);
 	ab_menu_prepare_bg();

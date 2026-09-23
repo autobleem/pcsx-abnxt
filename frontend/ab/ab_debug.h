@@ -12,7 +12,7 @@
  * One command per line, one reply per command ("ok ..." or "err ..."):
  *   press <key> [ms]     down, a hold of ms (60), up - key names are in_sdl2's, lower case: "escape",
  *                        "return", "up", "f9", "z", "eject" (the console's Open button), "reset"
- *   down <key>/up <key>  a held key (the menu button's 2 s hold = Reset off the console)
+ *   down <key>/up <key>  a held key (the menu button's 2 s hold = Reset)
  *   wait <ms>            sleep
  *   frames               how many frames have been presented
  *   shot <file.bmp>      the next frame presented, written out (the emulator's own screenshot is the raw

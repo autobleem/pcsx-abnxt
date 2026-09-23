@@ -723,7 +723,7 @@ static void update_input(void)
 		emu_act = which;
 	}
 #ifdef PSCLASSIC
-	emu_act = ab_filter_action(emu_act);	/* the menu button's hold is Reset off the console */
+	emu_act = ab_filter_action(emu_act);	/* the menu button's hold is Reset */
 #endif
 	emu_set_action(emu_act);
 
