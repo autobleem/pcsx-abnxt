@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
         *) echo "usage: $0 [--version X]" >&2; exit 2 ;;
     esac
 done
-[ -n "$VERSION" ] || VERSION="$(git describe --always --tags 2>/dev/null || echo unknown)"
+[ -n "$VERSION" ] || VERSION="$(git describe --always --tags --exclude nightly 2>/dev/null || echo unknown)"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DATE="$(date -u +%Y-%m-%d)"
 OUT=dist/packages

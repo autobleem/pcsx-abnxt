@@ -60,7 +60,7 @@ jobs:
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             echo "version=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
           else
-            echo "version=$(git describe --always --tags)" >> "$GITHUB_OUTPUT"
+            echo "version=$(git describe --always --tags --exclude nightly)" >> "$GITHUB_OUTPUT"
           fi
 
   build:
