@@ -42,6 +42,8 @@ pack_linux() { # pack_linux <dist dir> <platform>
     local extra=()
     [ -d "$dist/skin" ] && extra+=(skin)
     [ -d "$dist/lang" ] && extra+=(lang)
+    # what the launcher may hand over (frontend/ab/ab_config.h) - without it the launcher uses none of it
+    [ -f "$dist/abfeatures" ] && extra+=(abfeatures)
     tar -C "$dist" --owner=0 --group=0 --mode='u=rwX,go=rX' -czf "$OUT/$name" pcsx-ab plugins "${extra[@]}"
     files+=("$plat:$name")
     echo "  $plat: $name ($(du -h "$OUT/$name" | cut -f1))"
@@ -60,6 +62,7 @@ pack_windows() {
     cp "$src"/plugins/*.dll "$stage/pcsx-abnxt/plugins/"
     cp frontend/pandora/skin/* frontend/ab/skin/* "$stage/pcsx-abnxt/skin/"
     cp frontend/ab/lang/*.txt "$stage/pcsx-abnxt/lang/"
+    cp frontend/ab/abfeatures "$stage/pcsx-abnxt/"
     # python's zipfile: MSYS2 has no zip, the Docker image no 7z
     python3 -c "import shutil, sys; shutil.make_archive(sys.argv[1], 'zip', sys.argv[2], 'pcsx-abnxt')" "$OUT/${name%.zip}" "$stage"
     rm -rf "$stage"
