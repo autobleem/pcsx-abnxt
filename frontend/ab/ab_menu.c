@@ -46,7 +46,8 @@ static void ab_menu_prepare_bg(void);
 
 static const char h_ab_filter[] = "Off = plain pixels, Linear = smoothed, Sharp = crisp pixels without shimmer";
 static const char h_ab_pcsx[]   = "PCSX-ReARMed's own menu: options, controls, cheats...";
-static const char h_ab_savecfg[] = "Keeps today's settings for this game in AutoBleem";
+static const char h_ab_savecfg[] = "Keeps these settings for this game; AutoBleem shows its own locked until"
+                                   " you unlock them in the game's settings";
 static const char h_ab_scanlines[] = "Dark lines between the picture's rows, 1-3 rows thick;"
                                      " brightness is how dark";
 /* upstream's soft_filter (the PCSX menu's "Software Filter"), with our hq2x/hq3x - ab_scaler.c */
@@ -78,38 +79,15 @@ static menu_entry e_menu_ab[] =
 	mee_enum_h    ("Controller 1",             0,                   in_type_sel1, men_in_type_sel, h_ab_pad),
 	mee_enum_h    ("Controller 2",             0,                   in_type_sel2, men_in_type_sel, h_ab_pad),
 	mee_handler_id_h("PCSX menu",              MA_AB_PCSX_MENU,     ab_menu_pcsx_handler, h_ab_pcsx),
-	mee_handler_id_h("Save AutoBleem config",  MA_AB_SAVECFG,       ab_menu_handler, h_ab_savecfg),
+	mee_handler_id_h("Save settings for this game", MA_AB_SAVECFG,  ab_menu_handler, h_ab_savecfg),
 	mee_handler_id_h("Exit",                   MA_MAIN_EXIT,        main_menu_handler, NULL),
 	mee_end,
 };
 
-/* the config as pcsx.cfg (upstream's writer) and a copy as autobleem.cfg, which the launcher makes the
- * game's pcsx.cfg after the run */
+/* the game's own config, pcsx.custom.cfg - what every save in these menus writes (ab_config.h) */
 static int ab_save_config(void)
 {
-	char src[MAXPATHLEN], dst[MAXPATHLEN], buf[4096];
-	FILE *fi, *fo;
-	size_t n;
-
-	if (menu_write_config(0) != 0)
-		return -1;
-	emu_make_path(src, sizeof(src), PCSX_DOT_DIR, cfgfile_basename);
-	emu_make_path(dst, sizeof(dst), PCSX_DOT_DIR, "autobleem.cfg");
-	fi = fopen(src, "rb");
-	if (fi == NULL)
-		return -1;
-	fo = fopen(dst, "wb");
-	if (fo == NULL) {
-		fclose(fi);
-		return -1;
-	}
-	while ((n = fread(buf, 1, sizeof(buf), fi)) > 0)
-		fwrite(buf, 1, n, fo);
-	fflush(fo);
-	fsync(fileno(fo));
-	fclose(fo);
-	fclose(fi);
-	return 0;
+	return menu_write_config(1);
 }
 
 static int ab_menu_handler(int id, int keys)
@@ -165,7 +143,7 @@ static int ab_menu_handler(int id, int keys)
 		}
 		break;
 	case MA_AB_SAVECFG:
-		menu_update_msg(ab_save_config() == 0 ? "AutoBleem config saved" : "Failed to save the config");
+		menu_update_msg(ab_save_config() == 0 ? "Saved for this game" : "Failed to save the settings");
 		break;
 	default:
 		break;

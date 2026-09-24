@@ -206,8 +206,8 @@ Linux only, ending at once without the files). `ab_disc`: the disc set (multi-di
 folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
 start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells `ab_memcard`. `ab_menu.c`:
 the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Smoothing, Screen, Scanlines,
-the controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
-`autobleem.cfg`, Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
+the controllers, PCSX menu = upstream's whole menu beneath, Save settings for this game = the game's own
+`pcsx.custom.cfg` - see "A game's config", Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
 libpicofe's menu.c because the menu machinery is static there. `ab_debug.c`: the debug driver (see "the debug driver"; `AB_DEBUG_PORT` only). `ab_scaler.c` + `hqx/`: the smoothing
 scalers (see "Smoothing"; `tools/vendor_hqx.py` regenerates `hqx/hq2x.c`/`hq3x.c` from a clone of
 grom358/hqx). Player 2's sticks: `in_adev[4]` ([2]/[3]), `update_analogs()` over both players.
@@ -216,7 +216,8 @@ Upstream files edited so far (the whole list - keep it that way): `frontend/main
 for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
 default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
 default, our three `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
-names, `men_soft_filter`'s five names on every platform; `menu_init` keeps the "Video output mode" row off
+names, the game's own config - its name, load order, the merging save and binary files, see "A game's
+config" -, `men_soft_filter`'s five names on every platform; `menu_init` keeps the "Video output mode" row off
 when the platform has no `vout_methods` - ours has none, and upstream's `MENU_SHOW_VOUTMODE` default of 1
 re-enabled the row with a NULL name list, which crashed the PCSX menu's [Display] page on every target,
 found on the console with r26-alpha1 - a PR candidate), `frontend/menu.h` (`SOFT_FILTER_HQ2X/HQ3X`),
@@ -238,6 +239,21 @@ second) leaves the game spinning in the HLE BIOS - with lightrec and with the in
 same state loads fine. Upstream's HLE keeps state outside RAM, so a state taken later cannot be put into a
 freshly booting HLE. The console and the Pi run real BIOS files, where this does not arise; a PC without one
 cannot test the resume path.
+
+**A game's config** (2026-09-24, the owner's design, `frontend/ab/ab_config.h` has it in full): one source
+at a time. `pcsx.cfg` is AutoBleem's (the launcher's game editor; `launch.sh` puts it in `.pcsx/`);
+`.pcsx/pcsx.custom.cfg` is the game's own, and **every save in the menus writes it** - "Save settings for
+this game" in ours and in the PCSX menu's Options and Controls pages (upstream's "Save global config" and
+"Save cfg for loaded game" are gone under PSCLASSIC; `make_cfg_fname(1)` is the fixed name, not the per-disc
+`cfg/<label>-<id>.cfg`). While it exists the launcher shows the game's emulator settings locked, "Unlock"
+there deletes it. At the game's start `menu_load_cd_image` loads `pcsx.cfg`, then the custom file over it
+(a key it lacks keeps AutoBleem's value); a key it has beats `-filter`/`-ratio` (`ab_config_loaded`). A
+save keeps the lines of keys this build does not know (pcsx-ab's: the two emulators share the file), once
+each and without a CR, and writes `Bios = SET_BY_PCSX` back while the BIOS is the one it picked
+(`ab_bios_set_by_pcsx`). Found on the way: upstream's first-run BIOS autoselect took every menu opening
+under AutoBleem for a first run (our pcsx.cfg has no `config_save_counter`) and put `romJP.bin` in - gone
+under PSCLASSIC; and the config was written in text mode, so on Windows (CRLF) `menu_load_config` never
+read it back - binary both ways now, `parse_str_val` drops a CR. pcsx-ab (pcsx-ab2) does the same.
 
 **The save-state layout is pcsx-ab's** (2026-09-24, `libpcsxcore/state_sony.c`, the owner's call): the
 launcher lets the player switch between the two emulators, so a resume point either wrote has to be one the
@@ -324,7 +340,7 @@ is no help there: it crashes a moment after loading any state, its own included.
   command line (`-filter -ratio -lang -region 4 -enter 1 [-load 1] -cdfile`), `pcsx.cfg`'s keys
   (`Bios = SET_BY_PCSX`, `SlowBoot`, the launcher's nine values), `memcards/card1.mcd` (+ `none`),
   and on exit `filename.txt` / `sstates/<name>.000` / `screenshots/<name>.png` / `lastcdimg.txt`,
-  `autobleem.cfg`. The binary keeps the name `pcsx-ab` inside AutoBleem's payloads so no launcher script
+  and a saved config is `pcsx.custom.cfg` (was `autobleem.cfg` until 2026-09-24). The binary keeps the name `pcsx-ab` inside AutoBleem's payloads so no launcher script
   changes; About and `-v` say pcsx-abnxt.
 - **Style**: upstream files keep notaz's style (tabs); ours under `frontend/ab/` follow it - no reformatting
   of upstream code, ever (merge noise). `.gitattributes` covers only our paths (33 upstream files are CRLF and

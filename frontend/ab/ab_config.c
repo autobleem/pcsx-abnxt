@@ -21,8 +21,8 @@
 /* the BIOS files AutoBleem keeps in System/Bios (the launcher's launch.sh links it as bios/) */
 #define AB_BIOS_WORLD "romw.bin"
 #define AB_BIOS_JAPAN "romJP.bin"
-/* what the launcher writes into pcsx.cfg's Bios key */
-#define AB_BIOS_SET_BY_PCSX "SET_BY_PCSX"
+
+static int bios_auto;	/* the BIOS came from "SET_BY_PCSX" and nobody chose another since */
 
 struct ab_options ab_opts = {
 	.filter = 0,
@@ -154,12 +154,38 @@ int ab_args_take(int argc, char *argv[])
 	return out;
 }
 
+/* 1 when the game's own config has "<key> = " at the start of a line */
+static int custom_has_key(const char *key)
+{
+	char path[MAXPATHLEN], line[256];
+	size_t n = strlen(key);
+	int found = 0;
+	FILE *f;
+
+	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, AB_CUSTOM_CFG);
+	f = fopen(path, "r");
+	if (f == NULL)
+		return 0;
+	while (!found && fgets(line, sizeof(line), f) != NULL)
+		found = strncmp(line, key, n) == 0 && strncmp(line + n, " = ", 3) == 0;
+	fclose(f);
+	return found;
+}
+
+int ab_bios_set_by_pcsx(void)
+{
+	return bios_auto && strcmp(Config.Bios[0], AB_BIOS_WORLD) == 0;
+}
+
 void ab_config_loaded(int is_game)
 {
 	if (strcmp(Config.Bios[0], AB_BIOS_SET_BY_PCSX) == 0) {
 		snprintf(Config.Bios[PSX_REGION_US], sizeof(Config.Bios[0]), "%s", AB_BIOS_WORLD);
 		snprintf(Config.Bios[PSX_REGION_EU], sizeof(Config.Bios[0]), "%s", AB_BIOS_WORLD);
 		snprintf(Config.Bios[PSX_REGION_JP], sizeof(Config.Bios[0]), "%s", AB_BIOS_JAPAN);
+		bios_auto = 1;
+	} else if (strcmp(Config.Bios[0], AB_BIOS_WORLD) != 0) {
+		bios_auto = 0;	/* a BIOS of the file's own choosing (a game config without the key keeps ours) */
 	}
 
 	/* the default card2.mcd: AutoBleem's memory-card sets are one card, swapped in as card1.mcd */
@@ -168,14 +194,15 @@ void ab_config_loaded(int is_game)
 		LoadMcds(Config.Mcd1, Config.Mcd2);
 	}
 
-	/* the launcher's per-launch choices beat the file's */
-	if (plat_target.hwfilters != NULL)
+	/* the launcher's per-launch choices beat the file's - but not the game's own config's */
+	if (plat_target.hwfilters != NULL && !(is_game && custom_has_key("plat_target.hwfilter")))
 		plat_target.hwfilter = ab_opts.filter;	/* hwfilters[] = { "Off", "Linear", "Sharp" }: the launcher sends 0/1 */
-	g_scaler = ab_opts.ratio ? SCALE_FULLSCREEN : SCALE_4_3;
+	if (!(is_game && custom_has_key("g_scaler3")))
+		g_scaler = ab_opts.ratio ? SCALE_FULLSCREEN : SCALE_4_3;
 	fprintf(stderr, "autobleem: %s config: filter=%s ratio=%s boot logo=%s scanlines=%d\n",
 		is_game ? "game" : "global",
 		plat_target.hwfilters != NULL ? plat_target.hwfilters[plat_target.hwfilter] : "-",
-		ab_opts.ratio ? "16:9" : "4:3", Config.SlowBoot ? "shown" : "skipped", scanlines);
+		g_scaler == SCALE_FULLSCREEN ? "16:9" : "4:3", Config.SlowBoot ? "shown" : "skipped", scanlines);
 	if (is_game)
 		ab_hacks_apply();	/* -sonyhacks: Sony's overrides for this serial, over the file (ab_hacks.h) */
 }
