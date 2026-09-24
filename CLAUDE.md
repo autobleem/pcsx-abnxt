@@ -13,7 +13,7 @@ change (commit messages are prose).
 **The port plan is complete** (the owner's call, 2026-09-20 night; the plan itself, `docs/port-plan.md`,
 is deleted as finished plans are - `git show 82d77a16:docs/port-plan.md` has it): the repositories, the CMake
 build for every target (psc, rpi, rpi64, pcusb, win64), the SDL2 platform, the launcher's contract
-(arguments, config, exit files), the front buttons with the autosave ring and the power daemon, the disc
+(arguments, config, exit files), the front buttons and the power daemon, the disc
 change with its picker (below), the in-game menu with every launcher option. All of it verified on Windows
 first; **running on the Pi 400 since 2026-09-20** (64-bit, `Autobleem/bin/emunxt/`, the launcher's
 Options -> "PS1 Emulator") - Crash Bandicoot and Harvest Moon with the real BIOS, the menu, scanlines, the
@@ -191,16 +191,20 @@ files (`ab_session_exit`, hooked after main()'s loop) - `sstates/<label>-<id>.00
 `screenshots/<label>-<id>.png`, `lastcdimg.txt`, and last `filename.txt`, named by the disc in the drive.
 `ab_buttons`: our emulator actions (`SACTION_AB_RESET` = "RESET button", `SACTION_AB_CD_CHANGE` = "CD
 Change button" - the pcsx.cfg bind names, on the `reset`/`eject` keys the console's front buttons send -
-`SACTION_AB_POWER_OFF`, `SACTION_AB_SNAPSHOT`), handled in `do_emu_action`'s default branch, and
+`SACTION_AB_POWER_OFF`), handled in `do_emu_action`'s default branch, and
 `ab_frame_tick()` from `pl_frame_limit`. **Rule**: anything that touches the emulator's state runs as an
-action, between CPU slices - `SaveState()` from inside a slice froze the game. `ab_autosave`: the ring
-(a memory `SaveState()` + the frame every 2 s, six kept, none in the first 10 s or near a memory-card
-write); Reset/Power leave the *oldest* one as the resume point, ~10 s back, written uncompressed (gzread
-takes it); the menu's Exit and the window's close leave the live state. `AB_NO_AUTOSAVE=1` turns it off.
+action, between CPU slices - `SaveState()` from inside a slice froze the game. **Every way out leaves the
+game as it is at that moment** (2026-09-24, the owner's call): the menu's Exit, the window's close, the
+menu button held, Reset, Power and overheating all end main()'s loop, and `ab_session_exit()` saves the
+live state after it, between two slices. Until then Reset/Power (and so the hold) left an autosave ring's
+oldest snapshot, ~10 s back, as Sony's firmware did - the ring (`ab_autosave`, a memory `SaveState()` every
+2 s) is gone with it. Two things a way out still waits for (`leave()` in `ab_buttons.c`): a memory-card
+write in the last 2 s (`ab_memcard`; "SAVING..." on the HUD - the state and the card file must agree),
+and two frames presented without the HUD, which is printed into the frame the resume picture is taken from.
 `ab_console`: the power daemon's `prepare_suspend` and `cpu_temp`/`temp_limit` watchers (inotify threads,
 Linux only, ending at once without the files). `ab_disc`: the disc set (multi-disc PBP, an `.m3u`, or the
 folder's images of the same kind) and the Open button through the core's lid, refused for 22 s after the
-start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells the ring. `ab_menu.c`:
+start; one press = the next disc, with a HUD line. `SaveMcd()` fsyncs and tells `ab_memcard`. `ab_menu.c`:
 the in-game menu (Resume, Quick save/load = slot 2, Change disc, Filter, Smoothing, Screen, Scanlines,
 the controllers, PCSX menu = upstream's whole menu beneath, Save AutoBleem config = pcsx.cfg + a copy as
 `autobleem.cfg`, Exit) on its own screen (see "The menu's look"), `#include`d into `frontend/menu.c` like
@@ -211,7 +215,7 @@ grom358/hqx). Player 2's sticks: `in_adev[4]` ([2]/[3]), `update_analogs()` over
 Upstream files edited so far (the whole list - keep it that way): `frontend/main.c` (`path_is_absolute()`
 for `C:\` paths - a candidate for an upstream PR; the `ab_*` hooks: the arguments, the exit, the action
 default; `PCSX_MEMCARD_COUNT` instead of a fixed nine cards, 2 here), `frontend/main.h` (the macro's
-default, our four `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
+default, our three `SACTION_AB_*` values), `frontend/menu.c` (the `ab_config_loaded` hook, two action
 names, `men_soft_filter`'s five names on every platform; `menu_init` keeps the "Video output mode" row off
 when the platform has no `vout_methods` - ours has none, and upstream's `MENU_SHOW_VOUTMODE` default of 1
 re-enabled the row with a NULL name list, which crashed the PCSX menu's [Display] page on every target,
@@ -245,8 +249,11 @@ GPU header has two more words, its SPU blob three more fields (`SPUInfo`, `volum
 12 bytes on a 32-bit build and 16 on a 64-bit one, both read), event slots 6/13 are its GPUBUSY/CDRPLAY
 (our SPU_IRQ/IRQ10; it plays CD audio on CDRPLAY, we on CDREAD), the CD-ROM struct has the same offsets
 but some fields mean something else (`cdrStateToSony`/`FromSony` at the end of `cdrom.c`), the MDEC's
-pointers count from psxM + 1 MB, its loader divides by the base counter's target, and the stream ends in
-its disc-change state where we save the pads. After that comes our extension (`ABNXTEX1`: the registers,
+pointers count from psxM + 1 MB, its loader divides by the base counter's target, it takes the GPU's busy
+bit from its copy of GPUSTAT in the hardware registers and only its GPU DMA event sets it again (we time
+busy with `gpuIdleAfter` and leave the copy as it happens to be - a state of ours saved in a busy moment
+kept pcsx-ab's GPU busy for good, Crash sat on its loading screen; written idle now unless a GPU DMA is
+running), and the stream ends in its disc-change state where we save the pads. After that comes our extension (`ABNXTEX1`: the registers,
 CD-ROM, counters, MDEC, pads and I_STAT as they were, and the SPU fields' width), which pcsx-ab never reads -
 so a state of ours comes back exactly. A file in upstream's layout (what nxt wrote before, RetroArch's)
 still loads as it is. An HLE-BIOS state cannot cross over (each emulator keeps its own HLE data in the BIOS
@@ -254,8 +261,11 @@ area) and is refused either way - pcsx-ab's `LoadState` got the same check. The 
 `state_sony.c` and `cdrom.c` fail the build if an upstream merge changes a section's size, and a size
 `SaveState()` does not expect makes it write upstream's layout rather than none. Verified on Windows
 2026-09-24: the console's own 2018 states (WipEout XL, Resident Evil 2, Tomb Raider II mid-read) continue
-here, and ours walk as pcsx-ab's layout section by section; **pcsx-ab loading ours is still to be seen on a
-console or a Pi** - the Windows pcsx-ab dev build crashes a moment after loading any state, its own included.
+here, and ours walk as pcsx-ab's layout section by section. pcsx-ab loading ours, on the Pi 400: Crash
+saved by nxt mid-read on its loading screen goes on into the level in pcsx-ab (run headless with
+`SDL_VIDEODRIVER=offscreen`, looked at by having gdb call its `SaveState()` and drawing the display area
+from the state's VRAM - its GPU plugin leaves the state's own picture black). The Windows pcsx-ab dev build
+is no help there: it crashes a moment after loading any state, its own included.
 
 ## What this is built from - read first
 
@@ -292,7 +302,7 @@ console or a Pi** - the Windows pcsx-ab dev build crashes a moment after loading
   of a file. This is what keeps `git merge upstream/master` cheap; merge at upstream release tags.
 - **We are a platform of upstream's, `psclassic`** (2026-09-21, the owner's ask, a dry run that held): the
   hooks in upstream files that are AutoBleem's own (the launch arguments, the exit files, the actions, the
-  autosave's memcard hook, our menu, `-dotdir`'s paths) sit under **`#ifdef PSCLASSIC`**, the way notaz's
+  memory-card hook, our menu, `-dotdir`'s paths) sit under **`#ifdef PSCLASSIC`**, the way notaz's
   ports sit under `PANDORA`/`MAEMO`; what is a fix or a feature for everyone (`path_is_absolute`,
   `PCSX_MEMCARD_COUNT` with its default of 9, the soft filter on every platform, the 4:3 layer rule, player
   2's analogs, `pl_scanlines_by_plat`) stays unconditional - those are the PR candidates. **A new hook goes

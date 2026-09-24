@@ -29,7 +29,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #ifdef PSCLASSIC
-#include "../frontend/ab/ab_autosave.h"
+#include "../frontend/ab/ab_memcard.h"
 #endif
 
 #ifdef USE_LIBRETRO_VFS

@@ -17,10 +17,9 @@
 #include "../plugin_lib.h"
 #include "../main.h"
 #include "ab_session.h"
-#include "ab_autosave.h"
 
 static char game_name[64];
-static int exit_saved, from_ring;
+static int exit_saved;
 
 const char *ab_session_game_name(void)
 {
@@ -40,11 +39,6 @@ const char *ab_session_game_name(void)
 			break;
 	snprintf(game_name, sizeof(game_name), "%.32s-%.9s", trimlabel, CdromId);
 	return game_name;
-}
-
-void ab_session_exit_from_ring(void)
-{
-	from_ring = 1;
 }
 
 static int write_lines(const char *fname, const char *line1, const char *line2)
@@ -99,17 +93,12 @@ int ab_session_save_exit(void)
 	snprintf(fname, sizeof(fname), "%s.png", name);
 	emu_make_path(picture_path, sizeof(picture_path), SCREENSHOTS_DIR, fname);
 
-	if (from_ring && ab_autosave_available()) {
-		if (ab_autosave_write_oldest(state_path, picture_path) != 0)
-			ret = -1;
-	} else {
-		if (SaveState(state_path) != 0) {
-			SysPrintf("autobleem: failed to save %s\n", state_path);
-			ret = -1;
-		}
-		if (save_live_picture(picture_path) != 0)
-			ret = -1;
+	if (SaveState(state_path) != 0) {
+		SysPrintf("autobleem: failed to save %s\n", state_path);
+		ret = -1;
 	}
+	if (save_live_picture(picture_path) != 0)
+		ret = -1;
 
 	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "lastcdimg.txt");
 	if (write_lines(path, iso, NULL) != 0)
@@ -119,8 +108,7 @@ int ab_session_save_exit(void)
 	if (write_lines(path, iso, name) != 0)
 		ret = -1;
 
-	SysPrintf("autobleem: resume point %s (%s) %s\n", name, from_ring ? "from the ring" : "live",
-		ret == 0 ? "saved" : "incomplete");
+	SysPrintf("autobleem: resume point %s %s\n", name, ret == 0 ? "saved" : "incomplete");
 	return ret;
 }
 

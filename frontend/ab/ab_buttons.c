@@ -14,15 +14,16 @@
 #include "../libpicofe/plat.h"
 #include "../main.h"
 #include "ab_buttons.h"
-#include "ab_autosave.h"
+#include "ab_memcard.h"
 #include "ab_console.h"
 #include "ab_debug.h"
-#include "ab_session.h"
 #include "ab_disc.h"
 
 extern enum sched_action emu_action, emu_action_old;
 
-static int reset_held;		/* a Reset that waits for a memory-card write to finish */
+static int exit_held;		/* a way out waiting (the memory card, a clean frame): its action */
+static int exit_frames;		/* frames still to present before it goes */
+static int exit_clean;		/* those frames were presented without the HUD */
 static int power_off_seen, overheat_seen;
 
 #define AB_MENU_HOLD_MS   2000	/* the menu button held this long is Reset */
@@ -39,11 +40,31 @@ void ab_request_action(int action)
 	emu_action = action;
 }
 
-/* the run ends with the ring's oldest snapshot as the resume point */
-static void reset_now(const char *why)
+/* The run ends: main()'s loop stops at the end of this CPU slice, and ab_session_exit() saves the game as
+ * it is at that moment as the resume point. Not while the game is writing its memory card - the state and
+ * the card file would disagree - so then the way out waits for the write to be over (ab_frame_tick). And
+ * the resume point's picture is the frame on screen, into which the HUD is printed ("HOLD TO EXIT",
+ * "SAVING..."): the HUD goes first and two more frames are presented without it. */
+static void leave(int action, const char *why)
 {
+	if (ab_memcard_busy()) {
+		if (!exit_held) {
+			SysPrintf("autobleem: %s held, the memory card is being written\n", why);
+			snprintf(hud_msg, sizeof(hud_msg), "SAVING...");
+			hud_new_msg = 3;
+		}
+		exit_held = action;
+		exit_clean = 0;
+		return;
+	}
+	if (!exit_clean) {
+		hud_msg[0] = 0;
+		exit_held = action;
+		exit_frames = 2;
+		exit_clean = 1;
+		return;
+	}
 	SysPrintf("autobleem: %s - leaving with the resume point\n", why);
-	ab_session_exit_from_ring();
 	emu_core_ask_exit();
 }
 
@@ -86,23 +107,13 @@ int ab_emu_action(int action)
 {
 	switch (action) {
 	case SACTION_AB_RESET:
-		if (ab_memcard_busy()) {
-			SysPrintf("autobleem: Reset held, the memory card is being written\n");
-			reset_held = 1;
-			snprintf(hud_msg, sizeof(hud_msg), "SAVING...");
-			hud_new_msg = 3;
-			return 1;
-		}
-		reset_now("Reset");
+		leave(action, "Reset");
 		return 1;
 	case SACTION_AB_POWER_OFF:
-		reset_now("Power");
+		leave(action, "Power");
 		return 1;
 	case SACTION_AB_CD_CHANGE:
 		ab_disc_change();
-		return 1;
-	case SACTION_AB_SNAPSHOT:
-		ab_autosave_take();
 		return 1;
 	default:
 		return 0;
@@ -129,14 +140,16 @@ void ab_frame_tick(void)
 		ab_request_action(SACTION_AB_RESET);
 		return;
 	}
-	if (reset_held && !ab_memcard_busy()) {
-		reset_held = 0;
-		ab_request_action(SACTION_AB_RESET);
+	if (exit_held && !ab_memcard_busy()) {
+		int action = exit_held;
+		if (exit_frames > 0) {
+			exit_frames--;
+			return;
+		}
+		exit_held = 0;
+		ab_request_action(action);
 		return;
 	}
 
 	ab_disc_tick();
-	/* SaveState() must run between two CPU slices, not from here inside one: as an action */
-	if (ab_autosave_due())
-		ab_request_action(SACTION_AB_SNAPSHOT);
 }

@@ -22,7 +22,6 @@
 #include "../libpicofe/plat.h"
 #include "../main.h"
 #include "ab_disc.h"
-#include "ab_autosave.h"
 
 enum disc_kind { DISCS_NONE, DISCS_SINGLE, DISCS_PBP, DISCS_FILES };
 
@@ -210,8 +209,6 @@ int ab_disc_insert(int index)
 	SetCdOpenCaseTime(time(NULL) + 2);
 	LidInterrupt();
 	disc_current = index;
-	/* a state from before the change would put the old disc back */
-	ab_autosave_reset();
 
 	snprintf(msg, sizeof(msg), "DISC %d OF %d INSERTED", index + 1, disc_count);
 	hud(msg);
