@@ -14,10 +14,12 @@
  *   - the CD-ROM struct is laid out the same but some fields hold something else (cdrStateToSony, cdrom.c);
  *   - the MDEC's run-length pointers are saved against psxM + 1 MB there, psxM here;
  *   - pcsx-ab's loader divides by the base root counter's target, which upstream leaves at 0;
+ *   - pcsx-ab keeps the GPU's busy bit in its copy of GPUSTAT and only its GPU DMA event sets it again,
+ *     where upstream times it with gpuIdleAfter (write_sony);
  *   - the stream ends in Sony's disc-change state (three ints) where upstream saves the pads.
  *
  * SaveState() runs upstream's SaveStateNative() into memory - SaveFuncs pointed at a buffer, the way the
- * autosave ring and the libretro core save to memory - with state_mark() noting where each section starts,
+ * libretro core saves to memory - with state_mark() noting where each section starts,
  * and writes it out through the caller's SaveFuncs translated. After pcsx-ab's last field it appends an
  * extension - EXT_MAGIC, a record count, then records of a 4-byte id, a length and the bytes - with the
  * sections the translation could not keep as they were: the registers, the CD-ROM, the root counters, the
@@ -66,6 +68,8 @@
 #define DISC_SIZE	(3 * sizeof(int))		/* pcsx-ab's disc_change_state */
 
 #define ISTAT_OFFSET	0x1070				/* I_STAT in the hardware registers */
+#define DMA2_CHCR_OFFSET 0x10a8				/* the GPU's DMA channel control */
+#define GPUSTAT_OFFSET	0x1814				/* the emulator's copy of GPUSTAT */
 #define SONY_GPU_EXTRA	(2 * sizeof(u32))		/* ulEventStatus, ulEventCnt */
 #define SONY_PSXINT_GPUBUSY 6
 #define SONY_PSXINT_CDRPLAY 13
@@ -189,7 +193,7 @@ static void mem_put(struct mem_stream *m, const void *data, size_t len)
 
 /* --- the section marks ------------------------------------------------------------------------------- */
 
-static struct mem_stream capture = { "(state)" };	/* kept between saves: the ring saves every 2 s */
+static struct mem_stream capture = { "(state)" };	/* its buffer is kept between saves */
 static size_t marks[STATE_SECTIONS];
 static int capturing;
 
@@ -294,35 +298,48 @@ static int write_sony(const char *file, const u8 *n)
 	SPUFreeze_t spu_hdr;
 	Rcnt rcnt[4];
 	u8 gpu_extra[SONY_GPU_EXTRA], disc[DISC_SIZE], mdec[MDEC_SIZE];
-	u8 *cdr;
+	u8 *cdr, *hw_sony;
 	u32 istat, native_istat, spu_size, part2_len, records, extra_len;
 	int cdda;
 	void *f;
 
 	cdr = malloc(cdrFreezeSize());
-	if (cdr == NULL)
+	hw_sony = malloc(HW_SIZE);
+	if (cdr == NULL || hw_sony == NULL) {
+		free(cdr);
+		free(hw_sony);
 		return -1;
+	}
 	memcpy(cdr, n + marks[STATE_CDR], cdrFreezeSize());
 	cdda = cdrStateToSony(cdr);
 
 	memset(&regs, 0, sizeof(regs));
 	memcpy(&regs, n + marks[STATE_REGS], REGS_SIZE);
+
+	/* the hardware registers as pcsx-ab reads them. A pending SPU IRQ goes into I_STAT now. And pcsx-ab
+	 * takes the GPU's busy bit from its copy of GPUSTAT, clearing it when a GPU DMA starts and setting it
+	 * again only from that DMA's event - where upstream times it with gpuIdleAfter and leaves the copy as
+	 * it happens to be. A state saved in one of upstream's short busy moments would keep pcsx-ab's GPU
+	 * busy for good (a game waiting for it never goes on), so it is idle here unless a DMA is running. */
+	memcpy(hw_sony, hw, HW_SIZE);
 	native_istat = istat = get32(hw + ISTAT_OFFSET);
 	if (regs.interrupt & (1u << PSXINT_SPU_IRQ))
 		istat |= SWAPu32(0x200);
+	set32(hw_sony + ISTAT_OFFSET, istat);
+	if (!(get32(hw + DMA2_CHCR_OFFSET) & SWAPu32(0x01000000)))
+		set32(hw_sony + GPUSTAT_OFFSET, get32(hw + GPUSTAT_OFFSET) | SWAPu32(PSXGPU_nBUSY));
 	regs_to_sony(&regs, cdda);
 
 	f = SaveFuncs.open(file, "wb");
 	if (f == NULL) {
 		free(cdr);
+		free(hw_sony);
 		return -1;
 	}
 
-	/* header, picture, RAM, BIOS, then the hardware registers with I_STAT as above */
+	/* header, picture, RAM, BIOS, the hardware registers as above */
 	SaveFuncs.write(f, n, marks[STATE_MEMORY] + RAM_SIZE + ROM_SIZE);
-	SaveFuncs.write(f, hw, ISTAT_OFFSET);
-	SaveFuncs.write(f, &istat, sizeof(istat));
-	SaveFuncs.write(f, hw + ISTAT_OFFSET + 4, HW_SIZE - ISTAT_OFFSET - 4);
+	SaveFuncs.write(f, hw_sony, HW_SIZE);
 	SaveFuncs.write(f, &regs, REGS_SIZE);
 
 	/* the GPU: ulFreezeVersion, ulStatus, Sony's two event words, the control registers, VRAM */
@@ -387,6 +404,7 @@ static int write_sony(const char *file, const u8 *n)
 
 	SaveFuncs.close(f);
 	free(cdr);
+	free(hw_sony);
 	return 0;
 }
 
