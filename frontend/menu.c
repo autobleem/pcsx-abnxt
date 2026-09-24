@@ -2079,39 +2079,6 @@ static void menu_loop_cheats(void)
 	}
 }
 
-// --------- main menu help ----------
-
-static void menu_bios_warn(void)
-{
-	int inp;
-	static const char msg[] =
-		"You don't seem to have copied any BIOS\n"
-		"files to\n%s\n\n"
-
-		"While many games work fine with fake\n"
-		"(HLE) BIOS, others (like MGS and FF8)\n"
-		"require BIOS to work.\n"
-		"After copying the file, you'll also need\n"
-		"to select it in the emu's menu:\n"
-		"options->[BIOS/Plugins]\n\n"
-		"The file is usually named SCPH1001.BIN,\n"
-		"but other not compressed files can be\n"
-		"used too.\n\n"
-		"Press %s or %s to continue";
-	char tmp_msg[sizeof(msg) + 64];
-
-	snprintf(tmp_msg, sizeof(tmp_msg), msg, Config.BiosDir,
-		in_get_key_name(-1, -PBTN_MOK), in_get_key_name(-1, -PBTN_MBACK));
-	while (1)
-	{
-		draw_menu_message(tmp_msg, NULL);
-
-		inp = in_menu_wait(PBTN_MOK|PBTN_MBACK, NULL, 70);
-		if (inp & (PBTN_MBACK|PBTN_MOK))
-			return;
-	}
-}
-
 // ------------ main menu ------------
 
 static menu_entry e_menu_main[];
@@ -2548,22 +2515,15 @@ static void menu_leave_emu(void);
 
 void menu_loop(void)
 {
-	static int warned_about_bios = 0;
 	static int sel = 0;
 
 	menu_leave_emu();
 
-	if (config_save_counter == 0) {
-		// assume first run
-		if (bioses[1] != NULL) {
-			// autoselect BIOS to make user's life easier
-			snprintf(Config.Bios[0], sizeof(Config.Bios[0]), "%s", bioses[1]);
-			bios_sel = 1;
-		}
-		else if (!warned_about_bios) {
-			menu_bios_warn();
-			warned_about_bios = 1;
-		}
+	// no "you have no BIOS" screen any more (the owner's call): the menu's header line says HLE or BIOS
+	if (config_save_counter == 0 && bioses[1] != NULL) {
+		// assume first run: autoselect BIOS to make user's life easier
+		snprintf(Config.Bios[0], sizeof(Config.Bios[0]), "%s", bioses[1]);
+		bios_sel = 1;
 	}
 
 	me_enable(e_menu_main, MA_MAIN_RESUME_GAME, ready_to_go);
