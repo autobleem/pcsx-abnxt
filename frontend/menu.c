@@ -705,6 +705,19 @@ static int menu_do_last_cd_img(int is_get)
 	int i, ret = -1;
 
 	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "lastcdimg.txt");
+	if (!is_get) {
+		/* every start comes here (menu_load_cd_image): the same line again is not written again */
+		char old[sizeof(last_selected_fname) + 2];
+		size_t n = 0;
+		f = fopen(path, "r");
+		if (f != NULL) {
+			n = fread(old, 1, sizeof(old) - 1, f);
+			fclose(f);
+		}
+		old[n] = 0;
+		if (n == strlen(last_selected_fname) + 1 && strncmp(old, last_selected_fname, n - 1) == 0 && old[n - 1] == '\n')
+			goto out;
+	}
 	f = fopen(path, is_get ? "r" : "w");
 	if (f == NULL) {
 		ret = -1;

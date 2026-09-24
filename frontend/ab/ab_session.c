@@ -8,6 +8,7 @@
  */
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "../../libpcsxcore/psxcommon.h"
@@ -16,6 +17,7 @@
 #include "../libpicofe/readpng.h"
 #include "../plugin_lib.h"
 #include "../main.h"
+#include "ab_config.h"
 #include "ab_session.h"
 
 static char game_name[64];
@@ -87,11 +89,23 @@ int ab_session_save_exit(void)
 
 	/* the state goes where get_state_filename() puts slot 0, by the disc in the drive: the launcher
 	 * records the name (filename.txt) with the disc (lastcdimg.txt) and starts the next run on that
-	 * disc, so the two agree again */
-	snprintf(fname, sizeof(fname), "%s.000", name);
-	emu_make_path(state_path, sizeof(state_path), STATES_DIR, fname);
-	snprintf(fname, sizeof(fname), "%s.png", name);
-	emu_make_path(picture_path, sizeof(picture_path), SCREENSHOTS_DIR, fname);
+	 * disc, so the two agree again. With $AB_EXIT_DIR all four go there instead, in the same layout -
+	 * RAM, from which the launcher keeps them only when the player picks a slot */
+	const char *exit_dir = ab_exit_dir();
+	if (exit_dir != NULL) {
+		mkdir(exit_dir, 0755);
+		snprintf(path, sizeof(path), "%s/sstates", exit_dir);
+		mkdir(path, 0755);
+		snprintf(path, sizeof(path), "%s/screenshots", exit_dir);
+		mkdir(path, 0755);
+		snprintf(state_path, sizeof(state_path), "%s/sstates/%s.000", exit_dir, name);
+		snprintf(picture_path, sizeof(picture_path), "%s/screenshots/%s.png", exit_dir, name);
+	} else {
+		snprintf(fname, sizeof(fname), "%s.000", name);
+		emu_make_path(state_path, sizeof(state_path), STATES_DIR, fname);
+		snprintf(fname, sizeof(fname), "%s.png", name);
+		emu_make_path(picture_path, sizeof(picture_path), SCREENSHOTS_DIR, fname);
+	}
 
 	if (SaveState(state_path) != 0) {
 		SysPrintf("autobleem: failed to save %s\n", state_path);
@@ -100,11 +114,17 @@ int ab_session_save_exit(void)
 	if (save_live_picture(picture_path) != 0)
 		ret = -1;
 
-	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "lastcdimg.txt");
+	if (exit_dir != NULL)
+		snprintf(path, sizeof(path), "%s/lastcdimg.txt", exit_dir);
+	else
+		emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "lastcdimg.txt");
 	if (write_lines(path, iso, NULL) != 0)
 		ret = -1;
 	/* last: the launcher takes its presence as "the run ended cleanly" */
-	emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "filename.txt");
+	if (exit_dir != NULL)
+		snprintf(path, sizeof(path), "%s/filename.txt", exit_dir);
+	else
+		emu_make_path(path, sizeof(path), PCSX_DOT_DIR, "filename.txt");
 	if (write_lines(path, iso, name) != 0)
 		ret = -1;
 

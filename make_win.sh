@@ -25,4 +25,5 @@ mkdir -p build_win/skin build_win/lang
 cp -u frontend/pandora/skin/* frontend/ab/skin/* build_win/skin/
 # the emulator's own screens in the launcher's languages (frontend/ab/ab_ui.h)
 cp -u frontend/ab/lang/*.txt build_win/lang/
+cp -u frontend/ab/abfeatures build_win/ # what the launcher may hand over (frontend/ab/ab_config.h)
 echo "==> build_win/pcsx-ab.exe"
