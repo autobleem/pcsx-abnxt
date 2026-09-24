@@ -23,6 +23,22 @@
 #ifndef PCSXAB_AB_CONFIG_H
 #define PCSXAB_AB_CONFIG_H
 
+/*
+ * A game's configuration has one source at a time (2026-09-24):
+ *
+ *   pcsx.cfg          AutoBleem's - the launcher's game editor writes it, launch.sh puts it in .pcsx/
+ *   pcsx.custom.cfg   the game's own, in .pcsx/ (its !SaveStates folder): every save in the emulator's
+ *                     menus writes it ("Save settings for this game"), keeping the keys it does not know
+ *                     (pcsx-ab's), and the launcher shows the game's settings locked while it exists -
+ *                     "Unlock" there deletes it and pcsx.cfg is the game's again
+ *
+ * At the game's start pcsx.cfg is loaded, then pcsx.custom.cfg over it (a key it lacks keeps AutoBleem's
+ * value), and a key it has beats the launcher's -filter/-ratio. pcsx-ab (pcsx-ab2) does the same.
+ */
+#define AB_CUSTOM_CFG "pcsx.custom.cfg"
+/* what the launcher writes into pcsx.cfg's Bios key: the BIOS by the disc's region */
+#define AB_BIOS_SET_BY_PCSX "SET_BY_PCSX"
+
 struct ab_options {
 	int filter;	/* -filter: 1 = bilinear scaling, 0 = nearest */
 	int ratio;	/* -ratio: 1 = fill the 16:9 screen, 0 = keep 4:3 */
@@ -58,7 +74,11 @@ const char *ab_gameid_format(const char *fmt, char *out, size_t size, const char
 /* After menu_load_config(is_game) parsed a config file: "Bios = SET_BY_PCSX" becomes the per-region BIOS
  * files AutoBleem's System/Bios holds (romJP.bin for Japan, romw.bin for the rest - the core then picks by
  * the disc's region, HLE when the file is missing), an unset second memory card is "none" (the launcher
- * swaps card1.mcd in and out and nothing else), and the command line's filter/ratio win over the file. */
+ * swaps card1.mcd in and out and nothing else), and the command line's filter/ratio win over the file -
+ * unless the game's own config (is_game) has the key. */
 void ab_config_loaded(int is_game);
+
+/* 1 while the BIOS is the one "SET_BY_PCSX" picked: a save writes "SET_BY_PCSX" back, not the file name */
+int ab_bios_set_by_pcsx(void);
 
 #endif

@@ -522,6 +522,14 @@ static char *get_cd_label(void)
 static void make_cfg_fname(char *buf, size_t size, int is_game)
 {
 	char id_buf[64];
+#ifdef PSCLASSIC
+	/* AutoBleem: the game's own config is one file whatever the disc, next to AutoBleem's pcsx.cfg in the
+	 * game's save-state folder - the one every save here writes (ab_config.h) */
+	if (is_game) {
+		emu_make_path(buf, size, PCSX_DOT_DIR, AB_CUSTOM_CFG);
+		return;
+	}
+#endif
 	if (is_game) {
 		snprintf(id_buf, sizeof(id_buf), "%.32s-%.9s.cfg",
 			get_cd_label(), CdromId);
@@ -541,18 +549,105 @@ static void write_u32_value(FILE *f, u32 v)
 	fprintf(f, "%x\n", v);
 }
 
+#ifdef PSCLASSIC
+/* AutoBleem: the lines of a config this build does not know - the other emulator's keys - kept when the
+ * file is rewritten, so a game's config saved in pcsx-ab and then here still has pcsx-ab's settings */
+static int config_key_known(const char *line)
+{
+	size_t n;
+	int i;
+
+	if (strncmp(line, "bind", 4) == 0 || strncmp(line, "lastcdimg", 9) == 0)
+		return 1;	/* the key bindings are written whole, below */
+	for (i = 0; i < ARRAY_SIZE(config_data); i++) {
+		n = strlen(config_data[i].name);
+		if (strncmp(line, config_data[i].name, n) == 0 && strncmp(line + n, " = ", 3) == 0)
+			return 1;
+	}
+	return 0;
+}
+
+/* 1 when the line at `line` has the key of a line before it in `old` */
+static int config_key_seen(const char *old, const char *line, size_t keylen)
+{
+	const char *p;
+
+	for (p = old; p < line; p = strchr(p, '\n') + 1) {
+		if (strncmp(p, line, keylen + 3) == 0)
+			return 1;
+		if (strchr(p, '\n') == NULL)
+			break;
+	}
+	return 0;
+}
+
+static void config_write_foreign(FILE *f, const char *old)
+{
+	const char *p, *e, *eq;
+	int len;
+
+	for (p = old; p != NULL && *p != 0; p = e != NULL ? e + 1 : NULL) {
+		e = strchr(p, '\n');
+		eq = strstr(p, " = ");
+		if (eq == NULL || (e != NULL && eq > e))
+			continue;	/* not a key = value line */
+		if (config_key_known(p) || config_key_seen(old, p, eq - p))
+			continue;
+		len = e != NULL ? (int)(e - p) : (int)strlen(p);
+		while (len > 0 && p[len - 1] == '\r')
+			len--;
+		fprintf(f, "%.*s\n", len, p);
+	}
+}
+
+static char *config_read_file(const char *path)
+{
+	FILE *f = fopen(path, "rb");
+	char *buf = NULL;
+	long size;
+
+	if (f == NULL)
+		return NULL;
+	fseek(f, 0, SEEK_END);
+	size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	if (size > 0 && (buf = malloc(size + 1)) != NULL) {
+		if (fread(buf, 1, size, f) == (size_t)size)
+			buf[size] = 0;
+		else {
+			free(buf);
+			buf = NULL;
+		}
+	}
+	fclose(f);
+	return buf;
+}
+#endif
+
 static int menu_write_config(int is_game)
 {
 	char cfgfile[MAXPATHLEN];
 	FILE *f;
 	int i;
+#ifdef PSCLASSIC
+	char *old = NULL;
+#endif
 
 	config_save_counter++;
 
 	make_cfg_fname(cfgfile, sizeof(cfgfile), is_game);
-	f = fopen(cfgfile, "w");
+#ifdef PSCLASSIC
+	if (is_game)
+		old = config_read_file(cfgfile);
+#endif
+	/* binary: a text-mode file on Windows gets CRLF, and menu_load_config compares what fread returns with
+	 * the size in bytes - the file could never be read back (upstream has it this way too) */
+	f = fopen(cfgfile, "wb");
 	if (f == NULL) {
 		printf("menu_write_config: failed to open: %s\n", cfgfile);
+#ifdef PSCLASSIC
+		free(old);
+#endif
 		return -1;
 	}
 
@@ -560,6 +655,14 @@ static int menu_write_config(int is_game)
 
 	for (i = 0; i < ARRAY_SIZE(config_data); i++) {
 		fprintf(f, "%s = ", config_data[i].name);
+#ifdef PSCLASSIC
+		/* the BIOS the launcher's "SET_BY_PCSX" picked by region stays "SET_BY_PCSX", unless the player
+		 * chose another in the menu */
+		if (config_data[i].val == Config.Bios[0] && ab_bios_set_by_pcsx()) {
+			fprintf(f, "%s\n", AB_BIOS_SET_BY_PCSX);
+			continue;
+		}
+#endif
 		if (config_data[i].len > 8) { // string
 			fprintf(f, "%s\n", (char *)config_data[i].val);
 			continue;
@@ -581,6 +684,12 @@ static int menu_write_config(int is_game)
 		}
 	}
 
+#ifdef PSCLASSIC
+	if (old != NULL) {
+		config_write_foreign(f, old);
+		free(old);
+	}
+#endif
 	keys_write_all(f);
 	fclose(f);
 
@@ -637,6 +746,8 @@ static void parse_str_val(char *cval, size_t len, const char *src)
 		if (len > l1)
 			len = l1;
 	}
+	while (len > 0 && src[len - 1] == '\r')
+		len--;	/* a CRLF file, read in binary (menu_write_config) */
 	memcpy(cval, src, len);
 	cval[len] = 0;
 }
@@ -652,7 +763,7 @@ int menu_load_config(int is_game)
 	FILE *f;
 
 	make_cfg_fname(cfgfile, sizeof(cfgfile), is_game);
-	f = fopen(cfgfile, "r");
+	f = fopen(cfgfile, "rb");	/* see menu_write_config */
 	if (f == NULL) {
 		printf("menu_load_config: failed to open: %s\n", cfgfile);
 		goto fail;
@@ -1248,8 +1359,15 @@ static const char *mgn_saveloadcfg(int id, int *offs)
 
 static int mh_savecfg(int id, int keys)
 {
+#ifdef PSCLASSIC
+	/* AutoBleem: every save is the game's own config (ab_config.h) */
+	(void)id;
+	if (menu_write_config(1) == 0)
+		menu_update_msg("saved for this game");
+#else
 	if (menu_write_config(id == MA_OPT_SAVECFG_GAME ? 1 : 0) == 0)
 		menu_update_msg("config saved");
+#endif
 	else
 		menu_update_msg("failed to write config");
 
@@ -1290,8 +1408,12 @@ static menu_entry e_menu_keyconfig[] =
 	mee_onoff_h   ("Vibration",         MA_CTRL_VIBRATION,  in_enable_vibration, 1, h_vibration),
 	mee_range     ("Analog deadzone",   MA_CTRL_DEADZONE,   analog_deadzone, 1, 99),
 	mee_onoff_h   ("No TS Gun trigger", 0, g_opts, OPT_TSGUN_NOTRIGGER, h_notsgun),
+#ifdef PSCLASSIC
+	mee_cust_nosave("Save settings for this game", MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+#else
 	mee_cust_nosave("Save global config",       MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
 	mee_cust_nosave("Save cfg for loaded game", MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+#endif
 	mee_handler   ("Rescan devices:",  mh_input_rescan),
 	mee_label     (""),
 	mee_label_mk  (MA_CTRL_DEV_FIRST, mgn_dev_name),
@@ -1825,8 +1947,12 @@ static menu_entry e_menu_options[] =
 	mee_handler_id("[Display]",                MA_OPT_DISP_OPTS, menu_loop_gfx_options),
 	mee_handler   ("[BIOS/Plugins]",           menu_loop_plugin_options),
 	mee_handler   ("[Advanced]",               menu_loop_adv_options),
+#ifdef PSCLASSIC
+	mee_cust_nosave("Save settings for this game", MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+#else
 	mee_cust_nosave("Save global config",      MA_OPT_SAVECFG,      mh_savecfg, mgn_saveloadcfg),
 	mee_cust_nosave("Save cfg for loaded game",MA_OPT_SAVECFG_GAME, mh_savecfg, mgn_saveloadcfg),
+#endif
 	mee_handler_h ("Restore default config",   mh_restore_defaults, h_restore_def),
 	mee_end,
 };
@@ -2294,8 +2420,15 @@ int menu_load_cd_image(const char *fname)
 
 	prev_gpu = gpu_plugsel;
 	prev_spu = spu_plugsel;
+#ifdef PSCLASSIC
+	/* AutoBleem's pcsx.cfg, then the game's own config over it when it has one: a key it lacks keeps the
+	 * launcher's value (ab_config.h) */
+	menu_load_config(0);
+	menu_load_config(1);
+#else
 	if (menu_load_config(1) != 0)
 		menu_load_config(0);
+#endif
 
 	// check for plugin changes, have to repeat
 	// loading if game config changed plugins to reload them
@@ -2520,11 +2653,16 @@ void menu_loop(void)
 	menu_leave_emu();
 
 	// no "you have no BIOS" screen any more (the owner's call): the menu's header line says HLE or BIOS
+#ifndef PSCLASSIC
+	/* not under AutoBleem, which always says which BIOS (pcsx.cfg's "SET_BY_PCSX", by the disc's region):
+	 * a pcsx.cfg it writes has no config_save_counter, so this took every menu opening for a first run
+	 * and put the first BIOS of the folder in - romJP.bin - for the next boot, and into a saved config */
 	if (config_save_counter == 0 && bioses[1] != NULL) {
 		// assume first run: autoselect BIOS to make user's life easier
 		snprintf(Config.Bios[0], sizeof(Config.Bios[0]), "%s", bioses[1]);
 		bios_sel = 1;
 	}
+#endif
 
 	me_enable(e_menu_main, MA_MAIN_RESUME_GAME, ready_to_go);
 	me_enable(e_menu_main, MA_MAIN_SAVE_STATE,  ready_to_go && CdromId[0]);
