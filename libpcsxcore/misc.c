@@ -36,6 +36,7 @@
 #include "database.h"
 #include <zlib.h>
 #include "revision.h"
+#include "state_sony.h"
 
 char CdromId[10] = "";
 char CdromLabel[33] = "";
@@ -714,7 +715,9 @@ struct misc_save_data {
 
 #define EX_SCREENPIC_SIZE (128 * 96 * 3)
 
-int SaveState(const char *file) {
+// AutoBleem: upstream's SaveState()/LoadState(), renamed - SaveState()/LoadState() are in state_sony.c and
+// write/read pcsx-ab's layout through these two. The state_mark() calls are the only other change here.
+int SaveStateNative(const char *file) {
 	struct misc_save_data *misc = (void *)(psxRegs.ptrs.psxH + 0xf000);
 	struct origin_info oi = { 0, };
 	union {
@@ -750,6 +753,7 @@ int SaveState(const char *file) {
 
 	psxCpu->Notify(R3000ACPU_NOTIFY_BEFORE_SAVE, NULL);
 
+	state_mark(STATE_HEAD);
 	SaveFuncs.write(f, (void *)PcsxHeader, 32);
 	SaveFuncs.write(f, (void *)&SaveVersion, sizeof(u32));
 	SaveFuncs.write(f, (void *)&Config.HLE, sizeof(boolean));
@@ -768,18 +772,22 @@ int SaveState(const char *file) {
 	assert(sizeof(oi) - 3 <= EX_SCREENPIC_SIZE);
 	memset(u.buf, 0, sizeof(u.buf));
 	memcpy(u.buf + 3, &oi, sizeof(oi));
+	state_mark(STATE_PICTURE);
 	SaveFuncs.write(f, u.buf, sizeof(u.buf));
 
 	if (Config.HLE)
 		psxBiosFreeze(1);
 
+	state_mark(STATE_MEMORY);
 	SaveFuncs.write(f, psxRegs.ptrs.psxM, 0x00200000);
 	SaveFuncs.write(f, psxRegs.ptrs.psxR, 0x00080000);
 	SaveFuncs.write(f, psxRegs.ptrs.psxH, 0x00010000);
 	// only partial save of psxRegisters to maintain savestate compat
+	state_mark(STATE_REGS);
 	SaveFuncs.write(f, &psxRegs, offsetof(psxRegisters, gteBusyCycle));
 
 	// gpu
+	state_mark(STATE_GPU);
 	u.gpu_hdr.ulFreezeVersion = 1;
 	u.gpu_hdr.ulStatus = 0;
 	memset(u.gpu_hdr.ulControl, 0, sizeof(u.gpu_hdr.ulControl));
@@ -792,25 +800,34 @@ int SaveState(const char *file) {
 	assert(u.spu_hdr.Size > sizeof(u.spu_hdr) + 512*1024);
 	assert(u.spu_hdr.Size <= sizeof(u.spu_hdr) + 512*1024 + sizeof(u.spu_part2));
 	assert(spuram);
+	state_mark(STATE_SPU);
 	SaveFuncs.write(f, &u.spu_hdr.Size, 4); // redundant, for compat
 	SaveFuncs.write(f, &u.spu_hdr, sizeof(u.spu_hdr));
 	SaveFuncs.write(f, spuram, 512*1024);
 	SaveFuncs.write(f, &u.spu_part2, u.spu_hdr.Size - sizeof(u.spu_hdr) - 512*1024);
 
+	state_mark(STATE_SIO);
 	sioFreeze(f, 1);
+	state_mark(STATE_CDR);
 	cdrFreeze(f, 1);
+	state_mark(STATE_HW);
 	psxHwFreeze(f, 1);
+	state_mark(STATE_RCNT);
 	psxRcntFreeze(f, 1);
+	state_mark(STATE_MDEC);
 	mdecFreeze(f, 1);
+	state_mark(STATE_NDRC);
 	ndrc_freeze(f, 1);
+	state_mark(STATE_PAD);
 	padFreeze(f, 1);
+	state_mark(STATE_END);
 
 	memset(misc, 0, sizeof(*misc));
 	SaveFuncs.close(f);
 	return 0;
 }
 
-int LoadState(const char *file) {
+int LoadStateNative(const char *file) {
 	struct misc_save_data *misc = (void *)(psxRegs.ptrs.psxH + 0xf000);
 	u32 biosBranchCheckOld = psxRegs.biosBranchCheck;
 	union {

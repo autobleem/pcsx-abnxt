@@ -83,7 +83,7 @@ CXXFLAGS += $(CFLAGS)
 OBJS += libpcsxcore/cdriso.o libpcsxcore/cdrom.o libpcsxcore/cdrom-async.o \
 	libpcsxcore/cheat.o libpcsxcore/database.o \
 	libpcsxcore/decode_xa.o libpcsxcore/mdec.o \
-	libpcsxcore/misc.o libpcsxcore/plugins.o libpcsxcore/ppf.o libpcsxcore/psxbios.o \
+	libpcsxcore/misc.o libpcsxcore/state_sony.o libpcsxcore/plugins.o libpcsxcore/ppf.o libpcsxcore/psxbios.o \
 	libpcsxcore/psxcommon.o libpcsxcore/psxcounters.o libpcsxcore/psxdma.o \
 	libpcsxcore/psxhw.o libpcsxcore/psxinterpreter.o libpcsxcore/psxmem.o \
 	libpcsxcore/psxevents.o libpcsxcore/r3000a.o \

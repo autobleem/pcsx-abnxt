@@ -221,7 +221,11 @@ players; `pl_scanlines_by_plat`; the smoothing: `ab_soft_scale_factor()` in `pl_
 `ab_soft_blit()` in the flip in place of the `HAVE_NEON32` scalers, `resolution_ok()` against
 `PL_VOUT_MAX_*`, the 4:3 layer rule from the PSX line count), `frontend/plugin_lib.h` (the same tables,
 `pl_scanlines_by_plat`, `PL_VOUT_MAX_W/H`), `frontend/menu.c` also `#include`s `ab/ab_menu.c` and
-runs `ab_menu_loop_d()`, `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync in `SaveMcd`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
+runs `ab_menu_loop_d()` - and no "you have no BIOS" screen (`menu_bios_warn` is gone, 2026-09-24, the
+owner's call: the menu's header line says HLE or BIOS), `libpcsxcore/sio.c` (`ab_memcard_written()` + fsync in `SaveMcd`),
+`libpcsxcore/misc.c` (`SaveState`/`LoadState` renamed `SaveStateNative`/`LoadStateNative`, `state_mark()`
+between the sections - see "The save-state layout"), `libpcsxcore/cdrom.c` and `psxcounters.c` (a block
+of ours at the end of each), `CMakeLists.txt`/`Makefile` (`state_sony.c`), `.gitignore` (`/tools/*` so a file of ours under it can be tracked). Everything
 else Windows-specific is a shim: `frontend/win32/` (the host layer, `<dirent.h>` with `d_type`/`scandir`,
 `win32_compat.h` force-included by CMake) and `NO_DYLIB` (upstream's own Windows recipe).
 
@@ -230,6 +234,28 @@ second) leaves the game spinning in the HLE BIOS - with lightrec and with the in
 same state loads fine. Upstream's HLE keeps state outside RAM, so a state taken later cannot be put into a
 freshly booting HLE. The console and the Pi run real BIOS files, where this does not arise; a PC without one
 cannot test the resume path.
+
+**The save-state layout is pcsx-ab's** (2026-09-24, `libpcsxcore/state_sony.c`, the owner's call): the
+launcher lets the player switch between the two emulators, so a resume point either wrote has to be one the
+other continues from, and the layout they share is the one pcsx-ab (Sony's build) has always written.
+`SaveState()` runs upstream's `SaveStateNative()` into memory with `state_mark()` at each section and writes
+it translated; `LoadState()` reads the file, rebuilds upstream's stream and runs `LoadStateNative()` over
+it - so upstream's own save/load code is untouched. What differs (all in the file's header comment): Sony's
+GPU header has two more words, its SPU blob three more fields (`SPUInfo`, `volume`, `reverb` - a pointer, so
+12 bytes on a 32-bit build and 16 on a 64-bit one, both read), event slots 6/13 are its GPUBUSY/CDRPLAY
+(our SPU_IRQ/IRQ10; it plays CD audio on CDRPLAY, we on CDREAD), the CD-ROM struct has the same offsets
+but some fields mean something else (`cdrStateToSony`/`FromSony` at the end of `cdrom.c`), the MDEC's
+pointers count from psxM + 1 MB, its loader divides by the base counter's target, and the stream ends in
+its disc-change state where we save the pads. After that comes our extension (`ABNXTEX1`: the registers,
+CD-ROM, counters, MDEC, pads and I_STAT as they were, and the SPU fields' width), which pcsx-ab never reads -
+so a state of ours comes back exactly. A file in upstream's layout (what nxt wrote before, RetroArch's)
+still loads as it is. An HLE-BIOS state cannot cross over (each emulator keeps its own HLE data in the BIOS
+area) and is refused either way - pcsx-ab's `LoadState` got the same check. The `_Static_assert`s in
+`state_sony.c` and `cdrom.c` fail the build if an upstream merge changes a section's size, and a size
+`SaveState()` does not expect makes it write upstream's layout rather than none. Verified on Windows
+2026-09-24: the console's own 2018 states (WipEout XL, Resident Evil 2, Tomb Raider II mid-read) continue
+here, and ours walk as pcsx-ab's layout section by section; **pcsx-ab loading ours is still to be seen on a
+console or a Pi** - the Windows pcsx-ab dev build crashes a moment after loading any state, its own included.
 
 ## What this is built from - read first
 

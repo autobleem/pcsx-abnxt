@@ -224,6 +224,7 @@ set(PCSXAB_SOURCES
     libpcsxcore/psxcounters.c libpcsxcore/psxdma.c libpcsxcore/psxhw.c libpcsxcore/psxinterpreter.c
     libpcsxcore/psxmem.c libpcsxcore/psxevents.c libpcsxcore/r3000a.c libpcsxcore/sio.c
     libpcsxcore/spu.c libpcsxcore/gpu.c libpcsxcore/pad.c
+    libpcsxcore/state_sony.c
     libpcsxcore/gte.c libpcsxcore/gte_divider.c
     libpcsxcore/new_dynarec/emu_if.c
     # spu (dfsound is always built in)

@@ -24,6 +24,7 @@
 #include "psxcounters.h"
 #include "psxevents.h"
 #include "gpu.h"
+#include "state_sony.h"
 //#include "debug.h"
 #define DebugVSync()
 
@@ -612,6 +613,17 @@ s32 psxRcntFreeze( void *f, s32 Mode )
     }
 
     return 0;
+}
+
+/******************************************************************************/
+
+// AutoBleem: the base counter's target in pcsx-ab's save states (state_sony.c) - PSX clocks per scanline
+// by its tables, which its loader divides by. Upstream leaves the field unused.
+unsigned int psxRcntSonyBaseTarget(void)
+{
+    static const u32 frame_rate[] = { 60, 50 }, hsync_total[] = { 263, 313 };
+    int pal = Config.PsxType ? 1 : 0;
+    return PSXCLK / (frame_rate[pal] * hsync_total[pal]);
 }
 
 /******************************************************************************/

@@ -30,6 +30,7 @@
 #include "psxdma.h"
 #include "psxevents.h"
 #include "arm_features.h"
+#include "state_sony.h"
 
 /* logging */
 #if 0
@@ -1855,4 +1856,94 @@ int cdrFreeze(void *f, int Mode) {
 void LidInterrupt(void) {
 	getCdInfo();
 	cdrLidSeekInterrupt();
+}
+
+// --- AutoBleem: the CD-ROM section in pcsx-ab's save-state layout (state_sony.c) -------------------------
+// cdr is laid out byte for byte like pcsx-ab's cdrStruct (upstream kept the offsets for its old states),
+// what differs is what some of the fields hold. A section is what cdrFreeze() writes: cdr, then the FIFO
+// offset (pcsx-ab: pTransfer - Transfer).
+
+_Static_assert(sizeof(cdr) == 35288, "cdr no longer matches pcsx-ab's cdrStruct");
+
+// pcsx-ab's Seeked
+#define SONY_SEEK_PENDING 0
+#define SONY_SEEK_DONE    1
+
+int cdrFreezeSize(void)
+{
+	return sizeof(cdr) + sizeof(u32);
+}
+
+// Upstream's section -> pcsx-ab's. Returns 1 when CD audio is playing, which pcsx-ab runs on an event of its
+// own (CDRPLAY) where upstream runs it on CDREAD with the reads.
+int cdrStateToSony(void *section)
+{
+	__typeof__(cdr) c;
+	u32 tmp;
+	int ready, cdda;
+
+	memcpy(&c, section, sizeof(c));
+	memcpy(&tmp, (u8 *)section + sizeof(c), sizeof(tmp));
+	ready = c.FifoOffset < c.FifoSize;
+	cdda = c.Play && !c.Reading;
+
+	c.freeze_ver = 0x63647202;		// Prev in BCD, as pcsx-ab keeps it
+	if (c.Prev[0] != 0xff) {
+		c.Prev[0] = itob(c.Prev[0]);
+		c.Prev[1] = itob(c.Prev[1]);
+		c.Prev[2] = itob(c.Prev[2]);
+	}
+	c.unused0 = ready;			// OCUP: data waiting in the FIFO
+	c.unused1 = c.unused2 = 0;		// Reg1Mode, CmdProcess
+	c.ReportDelay = c.PhysCdPropagations = 0;	// padding there
+	c.sectorsRead = 0;
+	c.SubqForwardSectors = ready;		// Readed: the FIFO may be read
+	c.FileChannelSelected = c.CurFile = c.CurChannel = 0;	// the upper bytes of pcsx-ab's int Mode
+	memset(c.LocL, 0, sizeof(c.LocL));	// Reset, RErr, FirstSector
+	c.unused4 = 0;
+	c.FifoOffset = c.FifoSize = 0;		// Init
+	c.CmdInProgress &= ~CMD_WHILE_NOT_READY;	// Irq: the same command numbers, + 0x100 for a second response
+	c.Irq1Pending = c.AdpcmActive = 0;	// IrqRepeated, padding
+	c.LastReadSeekCycles = 0;		// eCycle
+	c.RetryDetected = c.DriveState == DRIVESTATE_SEEK ? SONY_SEEK_PENDING : SONY_SEEK_DONE;	// Seeked
+	if (c.DriveState > DRIVESTATE_STOPPED)	// paused, reading/playing, seeking: all "standby" there
+		c.DriveState = DRIVESTATE_STANDBY;
+	c.errorRetryhack = 0;			// padding
+	if (!ready)
+		tmp = 0;
+
+	memcpy(section, &c, sizeof(c));
+	memcpy((u8 *)section + sizeof(c), &tmp, sizeof(tmp));
+	return cdda;
+}
+
+// pcsx-ab's section -> upstream's, for cdrFreeze() to load. freeze_ver stays pcsx-ab's, which is what makes
+// cdrFreeze() take Prev from BCD.
+void cdrStateFromSony(void *section)
+{
+	__typeof__(cdr) c;
+	u32 tmp;
+	int readed;
+
+	memcpy(&c, section, sizeof(c));
+	memcpy(&tmp, (u8 *)section + sizeof(c), sizeof(tmp));
+	readed = c.SubqForwardSectors;
+
+	c.unused0 = c.unused1 = c.unused2 = 0;
+	c.ReportDelay = c.PhysCdPropagations = 0;
+	c.sectorsRead = 0;
+	c.FileChannelSelected = c.CurFile = c.CurChannel = 0;	// the next XA sector picks the channel again
+	memset(c.LocL, 0, sizeof(c.LocL));
+	c.unused4 = 0;
+	c.Irq1Pending = c.AdpcmActive = 0;
+	c.LastReadSeekCycles = 0;
+	c.RetryDetected = 0;
+	c.errorRetryhack = 0;
+	if (c.DriveState == DRIVESTATE_STANDBY)	// pcsx-ab's standby is a spinning drive
+		c.DriveState = c.Reading || c.Play ? DRIVESTATE_PLAY_READ : DRIVESTATE_PAUSED;
+	if (!readed)
+		tmp = DATA_SIZE;		// nothing to read in the FIFO
+
+	memcpy(section, &c, sizeof(c));
+	memcpy((u8 *)section + sizeof(c), &tmp, sizeof(tmp));
 }

@@ -19,8 +19,9 @@
 #include "../main.h"
 #include "ab_autosave.h"
 
-/* what a SaveState() produces uncompressed - 4.4 MB today (libretro's retro_serialize_size), with room */
-#define SNAPSHOT_BYTES (0x480000)
+/* what a SaveState() produces uncompressed - 4.4 MB today (libretro's retro_serialize_size) plus the
+ * shared layout's extension (state_sony.c), with room */
+#define SNAPSHOT_BYTES (0x4a0000)
 
 struct snapshot {
 	unsigned char *state;
