@@ -283,6 +283,26 @@ saved by nxt mid-read on its loading screen goes on into the level in pcsx-ab (r
 from the state's VRAM - its GPU plugin leaves the state's own picture black). The Windows pcsx-ab dev build
 is no help there: it crashes a moment after loading any state, its own included.
 
+## What the launcher hands over (2026-09-24, AutoBleem's quiet-stick plan)
+
+AutoBleem writes to the stick only when the user's state changes, and the emulator is asked to help
+through the environment - an older launcher sets none of these and an older emulator ignores them. The
+launcher reads the **`abfeatures`** file next to the binary (`frontend/ab/abfeatures`; the getters in `frontend/ab/ab_config.h`, copied by every packaging script:
+`ci/build.sh`, `make_rpi*.sh`, `make_win.sh`) and sets only what it lists:
+
+- `AB_EXIT_DIR` (`exitdir`): the resume point of the way out - `sstates/<name>.000`,
+  `screenshots/<name>.png`, `filename.txt` (last: "ended cleanly"), `lastcdimg.txt` - goes there, in
+  RAM, in the `.pcsx` layout; the launcher copies it to the stick only when the player keeps a slot.
+- `AB_MEMCARD_DIR` (`memcarddir`): the game's memory-card set (`Games/!MemCards/<set>`), played where it
+  is - `Config.Mcd1` points into it - instead of being copied in and out around the run.
+- `AB_LOAD_STATE` (`loadstate`): the kept slot to resume from, loaded like `-loadf` (and `-load` is then
+  ignored) instead of the launcher copying it to slot 0 first.
+
+Only the cards in use are created (no `card2.mcd`, which is "none"). Not yet run on a console.
+
+Also: `lastcdimg.txt` is not rewritten at start when it already names the disc, and stdout is
+line-buffered off Windows (`ab_args_take`).
+
 ## What this is built from - read first
 
 - The port plan (the analysis, the decisions, the eight phases) is in the git history: `git show

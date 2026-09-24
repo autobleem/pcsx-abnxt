@@ -611,6 +611,25 @@ static void check_memcards(void)
 	FILE *f;
 	int i;
 
+#ifdef PSCLASSIC
+	/* AutoBleem: the cards this run plays with, where they are - the game's own card1.mcd, or the set
+	 * $AB_MEMCARD_DIR names; a second card only when one is configured (AutoBleem's is "none"), so a
+	 * game's folder no longer gets a card2.mcd nothing reads */
+	const char *cards[2] = { Config.Mcd1, Config.Mcd2 };
+	(void)buf;
+	for (i = 0; i < 2; i++) {
+		if (cards[i][0] == 0 || strcmp(cards[i], "none") == 0)
+			continue;
+		f = fopen(cards[i], "rb");
+		if (f == NULL) {
+			SysPrintf("Creating memcard: %s\n", cards[i]);
+			CreateMcd((char *)cards[i]);
+		}
+		else
+			fclose(f);
+	}
+	return;
+#endif
 	for (i = 1; i <= PCSX_MEMCARD_COUNT; i++) {
 		char name[32];
 		snprintf(name, sizeof(name), "card%d.mcd", i);
@@ -700,6 +719,14 @@ int main(int argc, char *argv[])
 		}
 	}
 
+#ifdef PSCLASSIC
+	/* $AB_LOAD_STATE: the resume slot the launcher starts from, read where it is (it used to copy it to
+	 * slot 0's file first, a state's worth of writing to the stick per resume); it replaces -load */
+	if (ab_load_state() != NULL && loadst_f == NULL) {
+		loadst_f = ab_load_state();
+		loadst = 0;
+	}
+#endif
 	if (cdfile)
 		set_cd_image(cdfile);
 

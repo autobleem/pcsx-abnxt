@@ -81,4 +81,16 @@ void ab_config_loaded(int is_game);
 /* 1 while the BIOS is the one "SET_BY_PCSX" picked: a save writes "SET_BY_PCSX" back, not the file name */
 int ab_bios_set_by_pcsx(void);
 
+/* What the launcher hands over through the environment - each one listed in the abfeatures file next to
+ * the binary, which is how a launcher knows this build takes it (an older one ignores them); NULL when not
+ * given. AutoBleem's quiet-stick plan: nothing written to the stick that did not have to be.
+ *   AB_EXIT_DIR     where the resume point of the way out goes (ab_session.h), in RAM - the launcher copies
+ *                   it to the stick only when the player keeps it           (abfeatures: exitdir)
+ *   AB_MEMCARD_DIR  the memory-card set this game plays with, used in place  (abfeatures: memcarddir)
+ *   AB_LOAD_STATE   a state file to start from - a kept resume slot, read where it is instead of copied to
+ *                   slot 0 first                                             (abfeatures: loadstate) */
+const char *ab_exit_dir(void);
+const char *ab_memcard_dir(void);
+const char *ab_load_state(void);
+
 #endif

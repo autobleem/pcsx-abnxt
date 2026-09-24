@@ -1,6 +1,7 @@
 /*
  * What a run leaves behind for AutoBleem's launcher (ResumePointService reads them from the game's
- * !SaveStates folder, which is .pcsx/ here):
+ * !SaveStates folder, which is .pcsx/ here - or from $AB_EXIT_DIR, in the same layout, when the launcher
+ * gave one: RAM, so the stick is written only if the player keeps the resume point):
  *
  *   .pcsx/sstates/<label>-<id>.000       the resume state (save slot 0)
  *   .pcsx/screenshots/<label>-<id>.png   its picture

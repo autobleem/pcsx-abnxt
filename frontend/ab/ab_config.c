@@ -119,9 +119,14 @@ int ab_args_take(int argc, char *argv[])
 {
 	int i, out = 1;
 
-	/* the log is read after a crash or a kill more often than not; line buffering is full buffering on
-	 * the Windows CRT, so unbuffered it is (the console's AB_*.txt logs are the same) */
+	/* the log is read after a crash or a kill more often than not: a whole line reaches it at once. Line
+	 * buffering is full buffering on the Windows CRT, so there it is unbuffered; elsewhere a write per
+	 * character was a system call per character into the log (AutoBleem's quiet-stick plan) */
+#ifdef _WIN32
 	setvbuf(stdout, NULL, _IONBF, 0);
+#else
+	setvbuf(stdout, NULL, _IOLBF, 0);
+#endif
 	setvbuf(stderr, NULL, _IONBF, 0);
 
 	for (i = 1; i < argc; i++) {
@@ -172,6 +177,29 @@ static int custom_has_key(const char *key)
 	return found;
 }
 
+/* the launcher's hand-overs through the environment (the abfeatures file next to the binary says which
+ * this build takes); NULL when not given */
+static const char *ab_env(const char *name)
+{
+	const char *v = getenv(name);
+	return v != NULL && v[0] != 0 ? v : NULL;
+}
+
+const char *ab_exit_dir(void)
+{
+	return ab_env("AB_EXIT_DIR");
+}
+
+const char *ab_memcard_dir(void)
+{
+	return ab_env("AB_MEMCARD_DIR");
+}
+
+const char *ab_load_state(void)
+{
+	return ab_env("AB_LOAD_STATE");
+}
+
 int ab_bios_set_by_pcsx(void)
 {
 	return bios_auto && strcmp(Config.Bios[0], AB_BIOS_WORLD) == 0;
@@ -192,6 +220,16 @@ void ab_config_loaded(int is_game)
 	if (strstr(Config.Mcd2, "card2.mcd") != NULL) {
 		strcpy(Config.Mcd2, "none");
 		LoadMcds(Config.Mcd1, Config.Mcd2);
+	}
+	/* $AB_MEMCARD_DIR (abfeatures: memcarddir): the launcher's memory-card set for this game, played from
+	 * where it is - Games/!MemCards/<set>/card1.mcd - instead of copied into the game's folder and back */
+	if (ab_memcard_dir() != NULL) {
+		char mcd[sizeof(Config.Mcd1)];
+		snprintf(mcd, sizeof(mcd), "%s/card1.mcd", ab_memcard_dir());
+		if (strcmp(mcd, Config.Mcd1) != 0) {
+			snprintf(Config.Mcd1, sizeof(Config.Mcd1), "%s", mcd);
+			LoadMcds(Config.Mcd1, Config.Mcd2);
+		}
 	}
 
 	/* the launcher's per-launch choices beat the file's - but not the game's own config's */

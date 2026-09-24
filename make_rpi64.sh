@@ -41,6 +41,7 @@ done
 mkdir -p build_rpi64/dist/skin build_rpi64/dist/lang
 cp frontend/ab/skin/* build_rpi64/dist/skin/
 cp frontend/ab/lang/*.txt build_rpi64/dist/lang/
+cp frontend/ab/abfeatures build_rpi64/dist/
 echo "==> build_rpi64/dist:"
 ls -l build_rpi64/dist build_rpi64/dist/plugins
 
