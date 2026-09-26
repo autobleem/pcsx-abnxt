@@ -81,10 +81,19 @@ jobs:
       SCCACHE_DIR: /sccache
       SCCACHE_CACHE_SIZE: 2G
     steps:
+      # submodules stay off actions/checkout's own clone: it has no way to give the main repo full history
+      # (for `git describe`, above) while cloning the submodules shallow, so it is done as a second step -
+      # `git submodule update --depth 1` fetches each pinned commit directly, tags and all, without walking
+      # any submodule's history (nobody reads it: CMakeLists.txt's `git describe` runs in the main repo only,
+      # `--ignore-submodules=all` for the dirty check).
+      # safe.directory for this one command: the job runs as root in the container over a workspace the runner
+      # user made, and git refuses such a tree ("dubious ownership") - checkout's own safe.directory lives in a
+      # temporary HOME that is gone after its step (ext_store's container job hits the same)
       - uses: actions/checkout@v7
         with:
-          submodules: recursive
           fetch-depth: 0
+      - name: Shallow-clone the submodules
+        run: git -c safe.directory='*' submodule update --init --recursive --depth 1 --jobs 8
       # sccache with a local on-disk cache, persisted across runs by actions/cache. NOT sccache's built-in
       # GitHub-Actions-cache backend: GitHub retired the legacy artifact-cache API (v1) it calls, so it fails
       # every build. actions/cache@v6 uses the current cache service; ci/build.sh runs sccache from PATH with
@@ -113,10 +122,13 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
+      # see the `build` job's comment: full history on the main repo (git describe), submodules shallow.
       - uses: actions/checkout@v7
         with:
-          submodules: recursive
           fetch-depth: 0
+      - name: Shallow-clone the submodules
+        shell: bash
+        run: git submodule update --init --recursive --depth 1 --jobs 8
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
